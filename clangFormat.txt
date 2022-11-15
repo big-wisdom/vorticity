@@ -1,0 +1,31 @@
+find_program(CLANG_FORMAT "clang-format") 
+if (CLANG_FORMAT)
+    message("Clang-Format found at: " ${CLANG_FORMAT})
+    #
+    # Need to take the simple source file locations used for the project and get their full 
+    # file system locations for use in putting together the clang-format command line
+    #
+    unset(SOURCE_FILES_PATHS) 
+    foreach(SOURCE_FILE ${HEADER_FILES} ${SOURCE_FILES} ${UNIT_TEST_FILES} main.cpp) 
+        get_source_file_property(WHERE ${SOURCE_FILE} LOCATION) 
+        set(SOURCE_FILES_PATHS ${SOURCE_FILES_PATHS} ${WHERE}) 
+    endforeach()
+
+    #
+    # This creates the clang-format target/command
+    #
+    add_custom_target( 
+        ClangFormat 
+        COMMAND ${CLANG_FORMAT} 
+        -i 
+        -style=file
+        ${SOURCE_FILES_PATHS}
+    )
+    #
+    # This makes the clang-format target a dependency of the main
+    # RandDistribution project
+    #
+    add_dependencies(hpcProject ClangFormat) 
+else() 
+    message("Unable to find clang-format") 
+endif()
