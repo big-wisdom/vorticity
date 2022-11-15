@@ -3,7 +3,7 @@
 #include <iostream>
 #include <math.h>
 #include <vector>
-#include <vorticity.cpp>
+#include "vorticity.cpp"
 
 int main() {
   std::ifstream vectorField("cyl2d_1300x600_float[2].raw", std::ios::binary);
@@ -16,7 +16,7 @@ int main() {
     // Initialize arrays
     float *input = new float[length];
 
-    // Get rgb values from image into input array
+    // Get vector xy values from image into input array
     vectorField.read((char *)input, length);
     vectorField.close();
 
