@@ -19,7 +19,7 @@ int main() {
 
     // Initialize arrays
     float *input = new float[length];
-    uint32_t *output = new uint32_t[length / 2];
+    unsigned char *output = new unsigned char[length / 8];
 
     // Get rgb values from image into input array
     vectorField.read((char *)input, length);
@@ -28,13 +28,24 @@ int main() {
     // CPU serial implementation
     for (int i = 0; i < WIDTH; i++) {
       for (int j = 0; j < HEIGHT; j++) {
-        output[i * WIDTH + j] = vorticity(i, j, WIDTH, HEIGHT, input);
+        float vort = vorticity(i, j, WIDTH, HEIGHT, input);
+        unsigned char vortChar;
+        if(vort < -0.2f) {
+            vortChar = 0;
+        }
+        else if (vort > 0.2f) {
+            vortChar = 127;
+        }
+        else {
+            vortChar = 255;
+        }
+        output[i * WIDTH + j] = vortChar;
       }
     }
 
     // Writing output to file
     std::fstream outField("outfield.raw", std::ios::out | std::ios::binary);
-    outField.write(reinterpret_cast<char *>(output), length);
+    outField.write(reinterpret_cast<char *>(output), length / 8);
     outField.close();
   } else {
     std::cout << "Didn't open" << std::endl;
