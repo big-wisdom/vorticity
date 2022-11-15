@@ -3,24 +3,22 @@
 #include <iostream>
 #include <math.h>
 #include <vector>
+#include <vorticity.cpp>
 
 int main() {
-  std::ifstream image("gc_1024x1024.raw", std::ios::binary);
-  if (image.is_open()) {
+  std::ifstream vectorField("gc_1024x1024.raw", std::ios::binary);
+  if (vectorField.is_open()) {
     // Get the length of the image should be 3145728
-    image.seekg(0, std::ios_base::end);
-    auto length = image.tellg();
-    image.seekg(0, std::ios::beg);
+    vectorField.seekg(0, std::ios_base::end);
+    auto length = vectorField.tellg();
+    vectorField.seekg(0, std::ios::beg);
 
     // Initialize arrays
-    unsigned char *input = new unsigned char[length];
-    unsigned char *outputGPUGlobal = new unsigned char[length];
-    unsigned char *outputGPUShared = new unsigned char[length];
-    unsigned char *outputCPU = new unsigned char[length];
+    float *input = new float[length];
 
     // Get rgb values from image into input array
-    image.read((char *)input, length);
-    image.close();
+    vectorField.read((char *)input, length);
+    vectorField.close();
 
     return 0;
   }

@@ -1,7 +1,7 @@
 
 #include <cstdint>
-
 #include <utility>
+
 typedef std::pair<double, double> Vec2d;
 
 /*
