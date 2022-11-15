@@ -1,8 +1,4 @@
-
-#include <cstdint>
-#include <utility>
-
-typedef std::pair<double, double> Vec2d;
+#include "vorticity.hpp"
 
 /*
         Compute vorticity feature at cell coordinate (x, y) of the field f
