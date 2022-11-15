@@ -7,6 +7,7 @@
 
 #define WIDTH 1300
 #define HEIGHT 600
+#define CHANNELS 4
 
 int main() {
   std::ifstream vectorField("cyl2d_1300x600_float32[2].raw", std::ios::binary);
@@ -19,7 +20,7 @@ int main() {
 
     // Initialize arrays
     float *input = new float[length];
-    unsigned char *output = new unsigned char[length / 8];
+    unsigned char *output = new unsigned char[length / CHANNELS];
 
     // Get rgb values from image into input array
     vectorField.read((char *)input, length);
@@ -30,14 +31,12 @@ int main() {
       for (int j = 0; j < HEIGHT; j++) {
         float vort = vorticity(i, j, WIDTH, HEIGHT, input);
         unsigned char vortChar;
-        if(vort < -0.2f) {
-            vortChar = 0;
-        }
-        else if (vort > 0.2f) {
-            vortChar = 127;
-        }
-        else {
-            vortChar = 255;
+        if (vort < -0.2f) {
+          vortChar = 0;
+        } else if (vort > 0.2f) {
+          vortChar = 127;
+        } else {
+          vortChar = 255;
         }
         output[i * WIDTH + j] = vortChar;
       }
@@ -45,7 +44,7 @@ int main() {
 
     // Writing output to file
     std::fstream outField("outfield.raw", std::ios::out | std::ios::binary);
-    outField.write(reinterpret_cast<char *>(output), length / 8);
+    outField.write(reinterpret_cast<char *>(output), length / CHANNELS);
     outField.close();
   } else {
     std::cout << "Didn't open" << std::endl;
