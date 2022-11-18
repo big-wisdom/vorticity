@@ -7,7 +7,7 @@
 
 #define WIDTH 1300
 #define HEIGHT 600
-#define CHANNELS 4
+#define CHANNELS 2
 
 int main() {
   std::ifstream vectorField("cyl2d_1300x600_float32[2].raw", std::ios::binary);
@@ -27,9 +27,9 @@ int main() {
     vectorField.close();
 
     // CPU serial implementation
-    for (int i = 0; i < WIDTH; i++) {
-      for (int j = 0; j < HEIGHT; j++) {
-        float vort = vorticity(i, j, WIDTH, HEIGHT, input);
+    for (int i = 0; i < HEIGHT; i++) {
+      for (int j = 0; j < WIDTH; j++) {
+        float vort = vorticity(j, i, WIDTH, HEIGHT, input);
         unsigned char vortChar;
         if (vort < -0.2f) {
           vortChar = 0;
