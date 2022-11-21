@@ -1,4 +1,5 @@
 #include "vorticity.hpp"
+#include "implementations.hpp"
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -26,21 +27,8 @@ int main() {
     vectorField.read((char *)input, length);
     vectorField.close();
 
-    // CPU serial implementation
-    for (int i = 0; i < HEIGHT; i++) {
-      for (int j = 0; j < WIDTH; j++) {
-        float vort = vorticity(j, i, WIDTH, HEIGHT, input);
-        unsigned char vortChar;
-        if (vort < -0.2f) {
-          vortChar = 0;
-        } else if (vort > 0.2f) {
-          vortChar = 127;
-        } else {
-          vortChar = 255;
-        }
-        output[i * WIDTH + j] = vortChar;
-      }
-    }
+    // serial_vorticity(HEIGHT, WIDTH, input, output);
+    parallel_shared_memory_cpu(HEIGHT, WIDTH, input, output);
 
     // Writing output to file
     std::fstream outField("outfield.raw", std::ios::out | std::ios::binary);
