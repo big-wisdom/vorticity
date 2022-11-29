@@ -24,47 +24,58 @@ void convertTile(int height, int width, unsigned char *output, float *input) {
   int y = threadIdx.y + blockIdx.y * blockDim.y;
   // Copy over the vector information to the tile
   // Copy over the vector information to the tile
-  if (y - 1 == -1) { y = 1; }
-  if (x - 1 == -1) { x = 1; }
-  if (y - 1 == height) { y = height; }
-  if (x - 1 == width) {x = width;}
+  for (int i = 0; i < TILE_HEIGHT + HALO; i++) {
+    for (int j = 0; j < TILE_WIDTH + HALO; j++) {
+      if (y - 1 == -1) { y = 1; }
+      if (x - 1 == -1) { x = 1; }
+      if (y - 1 == height) { y = height; }
+      if (x - 1 == width) {x = width;}
 
-  vortTile[threadIdx.x][threadIdx.y][0] = input[CHANNELS * ((y - 1) * WIDTH + (x - 1))];
-  vortTile[threadIdx.x][threadIdx.y][1] = input[CHANNELS * ((y - 1) * WIDTH + (x - 1)) + 1];
-  __syncthreads();
-
-  //The vorticity funciton
-  float dx = 0.01;
-  float dy = 0.01;
-
-  uint32_t idx = y * width + x;
-
-  int start_x = (x == 0) ? 0 : x - 1;
-  int end_x = (x == width - 1) ? x : x + 1;
-
-  int start_y = (y == 0) ? 0 : y - 1;
-  int end_y = (y == height - 1) ? y : y + 1;
-
-  uint32_t duidx = (start_y * width + end_x) * 2;
-  uint32_t dvidx = (end_y * width + start_x) * 2;
-  double fdu[2] = {vortTile[end_x][start_y][0], vortTile[end_x][start_y][1]};
-  double fdv[2] = {vortTile[start_x][end_y][0], vortTile[start_x][end_y][1]};
-  double vec0[2] = {vortTile[x][y][0], vortTile[x][y][1]};
-  float duy = (fdu[1] - vec0[1]) / (dx * (end_x - start_x));
-  float dvx = (fdv[0] - vec0[0]) / (dy * (end_y - start_y));
-
-  float vort = duy - dvx;
-  //End of vorticity function
-  unsigned char vortChar;
-    if (vort < -0.2f) {
-      vortChar = 0;
-    } else if (vort > 0.2f) {
-      vortChar = 127;
-    } else {
-      vortChar = 255;
+      vortTile[threadIdx.x][threadIdx.y][0] = input[CHANNELS * ((y - 1) * WIDTH + (x - 1))];
+      vortTile[threadIdx.x][threadIdx.y][1] = input[CHANNELS * ((y - 1) * WIDTH + (x - 1)) + 1];
+      __syncthreads();
     }
-    output[y * width + x] = vortChar;
-    __syncthreads();
+  }
+
+  for (int i = 1; i <= TILE_HEIGHT; i++) {
+    for (int j = 1; j <= TILE_WIDTH; j++) {
+      //The vorticity funciton
+      float dx = 0.01;
+      float dy = 0.01;
+
+      uint32_t idx = y * width + x;
+
+      int start_x = (j == 0) ? 0 : j - 1;
+      int end_x = (j == width - 1) ? j : j + 1;
+
+      int start_y = (i == 0) ? 0 : i - 1;
+      int end_y = (i == height - 1) ? i : i` + 1;
+
+      uint32_t duidx = (start_y * width + end_x) * 2;
+      uint32_t dvidx = (end_y * width + start_x) * 2;
+      printf("I am the problem start:\n");
+      double fdu[2] = {vortTile[end_x][start_y][0], vortTile[end_x][start_y][1]};
+      double fdv[2] = {vortTile[start_x][end_y][0], vortTile[start_x][end_y][1]};
+      double vec0[2] = {vortTile[j][i][0], vortTile[j][i][1]};
+      printf("I am the problem end:\n");
+      float duy = (fdu[1] - vec0[1]) / (dx * (end_x - start_x));
+      float dvx = (fdv[0] - vec0[0]) / (dy * (end_y - start_y));
+
+      float vort = duy - dvx;
+      //End of vorticity function
+      printf("I am the reaper: %f\n", vort);
+      unsigned char vortChar;
+        if (vort < -0.2f) {
+          vortChar = 0;
+        } else if (vort > 0.2f) {
+          vortChar = 127;
+        } else {
+          vortChar = 255;
+        }
+        output[y * width + x] = vortChar;
+        __syncthreads();
+    }
+  }
 
 }
 

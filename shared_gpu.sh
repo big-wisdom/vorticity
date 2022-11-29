@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=00:02:00
+#SBATCH --time=00:03:00
 #SBATCH --nodes=1
 #SBATCH -o slurmjob-%j.out-%N 
 #SBATCH -e slurmjob-%j.err-%N 
