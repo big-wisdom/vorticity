@@ -8,4 +8,4 @@
 #SBATCH --gres=gpu
 
 #Run the program with input
-./
+./vorticityGpu 
