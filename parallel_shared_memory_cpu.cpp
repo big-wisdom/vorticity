@@ -10,7 +10,7 @@ void parallel_shared_memory_cpu(int HEIGHT, int WIDTH, float * input, unsigned c
     int i, j;
     #pragma omp parallel num_threads(thread_count) default(none) shared(output, input, HEIGHT, WIDTH) private(i, j)
     {
-        #pragma omp for
+        #pragma omp for collapse(2)
         for (i = 0; i < HEIGHT; i++) {
           for (j = 0; j < WIDTH; j++) {
             float vort = vorticity(j, i, WIDTH, HEIGHT, input);

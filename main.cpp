@@ -19,21 +19,31 @@ int main() {
     auto length = vectorField.tellg();
     vectorField.seekg(0, std::ios::beg);
 
-    // Initialize arrays
-    float *input = new float[length];
-    unsigned char *output = new unsigned char[length / CHANNELS];
-
     // Get rgb values from image into input array
+    float *input = new float[length];
     vectorField.read((char *)input, length);
     vectorField.close();
 
-    // serial_vorticity(HEIGHT, WIDTH, input, output);
+    // create output and valid arrays
+    unsigned char *output = new unsigned char[length / CHANNELS]; // we probably need to clean this up because we use the new keyword
+    unsigned char *valid = new unsigned char[length / CHANNELS];
+
+    // create valid with serial algorithm
+    serial_vorticity(HEIGHT, WIDTH, input, valid);
+
+    // Parallel shared memory
     parallel_shared_memory_cpu(HEIGHT, WIDTH, input, output);
+
+    if (validate(HEIGHT, WIDTH, output, valid))
+        printf("Parallel shared memory valid\n");
+    else
+        printf("Parallel shared memory invalid\n");
 
     // Writing output to file
     std::fstream outField("outfield.raw", std::ios::out | std::ios::binary);
     outField.write(reinterpret_cast<char *>(output), length / CHANNELS);
     outField.close();
+
   } else {
     std::cout << "Didn't open" << std::endl;
   }
