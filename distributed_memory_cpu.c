@@ -12,7 +12,6 @@ Run using:
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <iostream>
 #include <mpi.h>
 
 /* global variables */
@@ -39,7 +38,9 @@ int main(int argc, char* argv[]) {
   int i,j,k; //multipurpose ints
   int counter;
   int start,end;
-  MPI_Status status;
+  unsigned char vortChar;
+  FILE* pf;
+  FILE* wf;
 
   /* Initiate MPI*/
   MPI_Init(NULL, NULL);
@@ -49,17 +50,21 @@ int main(int argc, char* argv[]) {
 
   /* Find total number of processes */
   MPI_Comm_size(MPI_COMM_WORLD, &core_count);
+  printf("core count: %d\n", core_count);
 
+  printf("MPI initiated\n");
   /* Initiate important variables and arrays for all */
   width = 1300;
   height = 600;
   channels = 2;
-  tileh = height/core_count + 1;
+  if (height/core_count*core_count == height) {tileh = height/core_count;}
+  else {tileh = height/core_count + 1;}
   sendcounts = malloc(core_count*sizeof(int));
   displs = malloc(core_count*sizeof(int));
   tempin = malloc((tileh+2)*width*channels*sizeof(float));
   tempout = malloc(tileh*width*sizeof(unsigned char));
-
+  printf("tileh = %d\n", tileh);
+  printf("initial values created memory allocated\n");
 
   /* Rank 0 initiation work*/
   if (my_rank == 0) {
@@ -67,46 +72,67 @@ int main(int argc, char* argv[]) {
     input = malloc(height*width*channels*sizeof(float));
     output = malloc(height*width*sizeof(float));
     pf = fopen("cyl2d_1300x600_float32[2].raw", "rb");
-    if (pf == NULL){throw "File Issue";}
     fread(input, sizeof(float), height*width*channels, pf);
     fclose(pf);
   } 
 
+  printf("File read, getting values for sendcounts and displs\n");
+
   /* get values for sendcounts and displs arrays for scatterv */
-  for (i == 0; i < core_count; i++) {
-    if (i == core_count-1) { // sendcounts
+  for (i = 0; i < core_count; i++) {
+    if (core_count == 1) {
+      sendcounts[i] = tileh*width*channels;
+    } else if (i == core_count-1) { // at the end
       sendcounts[i] = (height-(core_count-1)*tileh+1)*width*channels;
-    } else if (i == 0) {
+    } else if (i == 0) {  // at the beginning
       sendcounts[i] = (tileh+1)*width*channels;
     } else {
       sendcounts[i] = (tileh+2)*width*channels; 
     }
     if (i == 0) {displs[i] = 0;} // displs
     else {displs[i] = (tileh*i-1)*width*channels;}
+    printf("i-%d, sendcount-%d, displs-%d\n",i,sendcounts[i],displs[i]);
   }
   
-  // send data out to all cores
-  MPI_Scatterv(input, sendcounts, displs, MPI_FLOAT,
-                tempin, sendcounts[my_rank], MPI_FLOAT, MPI_COMM_WORLD); 
+  printf("Scattering data \n");
 
-  /* serial implementation of vorticity plot */ 
-  if (my_rank == core_count-1) {// using k as "height" of the tempin
+  // send data out to all cores
+  MPI_Scatterv(input, sendcounts, displs, MPI_FLOAT, tempin, sendcounts[my_rank], MPI_FLOAT,0, MPI_COMM_WORLD); 
+  
+  for (i = 0; i < 600; i++) {
+    for (j = 0; j < 1300; j++) {
+      printf("tempin: %4.3f, %4.3f;", tempin[i*width+j], tempin[i*width+j+1]);
+    }
+  }
+
+  printf("Calculating vorticity \n");
+
+  /* calculating vorticity */ 
+  if (core_count == 1) {// using k as "height" of the tempin
+    k = tileh;
+    start = 0;
+    end = k;
+  } else if (my_rank == core_count-1) {
     k = height-(core_count-1)*tileh+1;
     start = 1;
-    end = k;}
-  else if (my_rank == 0) {
+    end = k;
+  } else if (my_rank == 0) {
     k = tileh+1;
     start = 0;
-    end = k-1;}
-  else {
+    end = k-1;
+  } else {
     k = tileh+2;
     start = 1;
-    end = k-1;}
+    end = k-1;
+  }
   counter = 0;
+  printf("k: %d\n",k);
+  printf("start: %d\n",start);
+  printf("end: %d\n",end);
   for (int i = start; i < end; i++) { // choose row
     for (int j = 0; j < width; j++) { // go through elements in row i
+      //printf("(%d, %d)-%d;", j, i, counter);
       float vort = vorticity(j, i, width, height, tempin);
-      unsigned char vortChar;
       if (vort < -0.2f) {
         vortChar = 0;
       } else if (vort > 0.2f) {
@@ -119,8 +145,10 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  printf("Calculating sendcounts and displs again\n");
+
   /* get values for sendcounts and displs arrays for gatherv */
-  for (i == 0; i < core_count; i++) {
+  for (i = 0; i < core_count; i++) {
     if (i == core_count-1) { // sendcounts
       sendcounts[i] = (height-(core_count-1)*tileh+1)*width;
     } else {
@@ -130,9 +158,12 @@ int main(int argc, char* argv[]) {
     else {displs[i] = (tileh*i-1)*width;}
   }
 
+  printf("Gathering data \n");
+
   /* collecting data from all cores*/
-  MPI_Gatherv(tempout, sendcounts[my_rank], MPI_UNSIGNED_CHAR, output,
-    sendcounts[my_rank], displs[my_rank], MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
+  MPI_Gatherv(tempout, sendcounts[my_rank], MPI_UNSIGNED_CHAR, output, sendcounts[my_rank], displs[my_rank], MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
+
+  printf("Writing outfile\n");
 
   /* writing outfile */
   if (my_rank == 0) {
@@ -143,6 +174,8 @@ int main(int argc, char* argv[]) {
     free(input);
     free(output);
   }
+
+  printf("Clean up and finalizing\n");
 
   /* cleanup */
   free(sendcounts);
