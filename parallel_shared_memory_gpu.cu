@@ -7,10 +7,10 @@
 
 #define WIDTH 1300
 #define HEIGHT 600
-#define GRID_WIDTH 20
-#define GRID_HEIGHT 30
-#define BLOCK_WIDTH 65
-#define BLOCK_HEIGHT 20
+#define GRID_WIDTH 65
+#define GRID_HEIGHT 20
+#define BLOCK_WIDTH 20
+#define BLOCK_HEIGHT 30
 #define HALO 2
 #define CHANNELS 2
 
@@ -21,44 +21,50 @@ void convertTile(int height, int width, unsigned char *output, float *input) {
 
   __shared__ float vortTile[BLOCK_WIDTH + HALO][BLOCK_HEIGHT + HALO][CHANNELS];
 
-  int x = threadIdx.x + blockIdx.x * blockDim.x;
-  int y = threadIdx.y + blockIdx.y * blockDim.y;
+  int x = threadIdx.x + (blockIdx.x * blockDim.x);
+  int y = threadIdx.y + (blockIdx.y * blockDim.y);
 
   // Copy over the vector information to the tile
   
   if (threadIdx.x == 0 && x != 0) {
-    vortTile[threadIdx.x][threadIdx.y + 1][0] = input[CHANNELS * (y * WIDTH + (x - 1))];
-    vortTile[threadIdx.x][threadIdx.y + 1][1] = input[CHANNELS * (y * WIDTH + (x - 1)) + 1];
+    vortTile[threadIdx.x][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + (x - 1))];
+    vortTile[threadIdx.x][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + (x - 1))) + 1];
   }
   
   if (threadIdx.x == (BLOCK_WIDTH - 1) && x != width - 1) {
-    vortTile[threadIdx.x + 2][threadIdx.y + 1][0] = input[CHANNELS * (y * WIDTH + (x + 1))];
-    vortTile[threadIdx.x + 2][threadIdx.y + 1][1] = input[CHANNELS * (y * WIDTH + (x + 1)) + 1];
+    vortTile[threadIdx.x + 2][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + (x + 1))];
+    vortTile[threadIdx.x + 2][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + (x + 1))) + 1];
   }
  
   if (threadIdx.y == 0 && y != 0) {
-    vortTile[threadIdx.x + 1][threadIdx.y][0] = input[CHANNELS * ((y - 1) * WIDTH + x)];
-    vortTile[threadIdx.x + 1][threadIdx.y][1] = input[CHANNELS * ((y - 1) * WIDTH + x) + 1];
+    vortTile[threadIdx.x + 1][threadIdx.y][0] = input[CHANNELS * (((y - 1) * WIDTH) + x)];
+    vortTile[threadIdx.x + 1][threadIdx.y][1] = input[(CHANNELS * (((y - 1) * WIDTH) + x)) + 1];
   }
   
   if (threadIdx.y == (BLOCK_HEIGHT - 1) && y != height - 1) {
-    vortTile[threadIdx.x + 1][threadIdx.y + 2][0] = input[CHANNELS * ((y + 1) * WIDTH + x)];
-    vortTile[threadIdx.x + 1][threadIdx.y + 2][1] = input[CHANNELS * ((y + 1) * WIDTH + x) + 1];
+    vortTile[threadIdx.x + 1][threadIdx.y + 2][0] = input[CHANNELS * (((y + 1) * WIDTH) + x)];  
+    vortTile[threadIdx.x + 1][threadIdx.y + 2][1] = input[(CHANNELS * (((y + 1) * WIDTH) + x)) + 1];
   }
-  vortTile[threadIdx.x + 1][threadIdx.y + 1][0] = input[CHANNELS * (y * WIDTH + x)];
-  vortTile[threadIdx.x + 1][threadIdx.y + 1][1] = input[CHANNELS * (y * WIDTH + x) + 1];
+  if (blockIdx.x == 0 && blockIdx.y == 0) {
+    printf("Threadx: %d thready: %d x: %d y: %d\n", threadIdx.x, threadIdx.y, x, y);
+  }
+  vortTile[threadIdx.x + 1][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + x)];
+  vortTile[threadIdx.x + 1][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + x)) + 1];
   __syncthreads();
 
-  if (threadIdx.x == 0 && threadIdx.y == 0 && x == 0 && y == 0)
-  {
-    for(int i = 1; i < BLOCK_WIDTH + 1; i++) {
-      for(int j = 1; j < BLOCK_HEIGHT + 1; j++) {
-        int newX = (i - 1) + blockIdx.x * blockDim.x;
-        int newY = (j - 1) + blockIdx.y * blockDim.y;
-        printf("x: %d y: %d Tile x: %f Tile y: %f input x: %f input y: %f\n",newX, newY,vortTile[i][j][0], vortTile[i][j][1], input[CHANNELS * (newY * width + (newX))], input[CHANNELS * (newY * width + (newX)) + 1]);
-      }
-    }
-  }
+  // if (threadIdx.x == 0 && threadIdx.y == 0 && x == 0 && y == 0)
+  // {
+  //   for(int i = 0; i < 65; i ++){
+  //   printf("x: %d y: %d Tile x: %f Tile y: %f input x: %f input y: %f\n",i, 0,vortTile[i + 1][1][0], vortTile[i + 1][1][1], input[2 * i], input[2 * i + 1]);
+  //   }
+  //   // for(int i = 0; i < BLOCK_HEIGHT; i++) {
+  //   //   for(int j = 0; j < BLOCK_WIDTH; j++) {
+  //   //     int newX = j + blockIdx.x * blockDim.x;
+  //   //     int newY = i + blockIdx.y * blockDim.y;
+  //   //     printf("x: %d y: %d Tile x: %f Tile y: %f input x: %f input y: %f\n",newX, newY,vortTile[j + 1][i + 1][0], vortTile[j + 1][i + 1][1], input[CHANNELS * (newY * width + (newX))], input[CHANNELS * (newY * width + (newX)) + 1]);
+  //   //   }
+  //   // }
+  // }
 
   //The vorticity funciton
   float dx = 0.01;
@@ -150,7 +156,7 @@ void parallel_shared_memory_gpu(int height, int width, float * input, unsigned c
     const dim3 block_size (BLOCK_WIDTH, BLOCK_HEIGHT);
     const dim3 grid_size (GRID_WIDTH, GRID_HEIGHT);
 
-    convertTile<<<block_size, grid_size>>>(height, width, outputDevice, inputDevice);
+    convertTile<<<grid_size, block_size>>>(height, width, outputDevice, inputDevice);
     printf("Error: %d", cudaDeviceSynchronize());
 
     //Return image to device and free memory
