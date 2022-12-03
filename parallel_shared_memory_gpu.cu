@@ -26,60 +26,70 @@ void convertTile(int height, int width, unsigned char *output, float *input) {
 
   // Copy over the vector information to the tile
   
-  if (threadIdx.x == 0 && x != 0) {
+  if (threadIdx.x == 0 && x != 0) { //get Left Halo
     vortTile[threadIdx.x][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + (x - 1))];
     vortTile[threadIdx.x][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + (x - 1))) + 1];
   }
   
-  if (threadIdx.x == (BLOCK_WIDTH - 1) && x != width - 1) {
+  if (threadIdx.x == (BLOCK_WIDTH - 1) && x != width - 1) { //get Right Halo
     vortTile[threadIdx.x + 2][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + (x + 1))];
     vortTile[threadIdx.x + 2][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + (x + 1))) + 1];
   }
  
-  if (threadIdx.y == 0 && y != 0) {
+  if (threadIdx.y == 0 && y != 0) { //get Upper Halo
+    if (threadIdx.x == (BLOCK_WIDTH - 1) && x != width - 1) { //get Upper Right Corner 
+      vortTile[threadIdx.x + 2][threadIdx.y][0] = input[CHANNELS * (((y - 1) * WIDTH) + (x + 1))];
+      vortTile[threadIdx.x + 2][threadIdx.y][1] = input[CHANNELS * (((y - 1) * WIDTH) + (x + 1)) + 1];
+    }
     vortTile[threadIdx.x + 1][threadIdx.y][0] = input[CHANNELS * (((y - 1) * WIDTH) + x)];
     vortTile[threadIdx.x + 1][threadIdx.y][1] = input[(CHANNELS * (((y - 1) * WIDTH) + x)) + 1];
   }
   
-  if (threadIdx.y == (BLOCK_HEIGHT - 1) && y != height - 1) {
+  if (threadIdx.y == (BLOCK_HEIGHT - 1) && y != height - 1) { // Get Lower Halo
+    if (threadIdx.x == 0 && x != 0) { //get Lower Left Corner
+      vortTile[threadIdx.x][threadIdx.y + 2][0] = input[CHANNELS * (((y + 1) * WIDTH) + (x - 1))];  
+      vortTile[threadIdx.x][threadIdx.y + 2][1] = input[(CHANNELS * (((y + 1) * WIDTH) + (x - 1))) + 1];
+    }
     vortTile[threadIdx.x + 1][threadIdx.y + 2][0] = input[CHANNELS * (((y + 1) * WIDTH) + x)];  
     vortTile[threadIdx.x + 1][threadIdx.y + 2][1] = input[(CHANNELS * (((y + 1) * WIDTH) + x)) + 1];
-  }
-  if (blockIdx.x == 0 && blockIdx.y == 0) {
-    printf("Threadx: %d thready: %d x: %d y: %d\n", threadIdx.x, threadIdx.y, x, y);
   }
   vortTile[threadIdx.x + 1][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + x)];
   vortTile[threadIdx.x + 1][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + x)) + 1];
   __syncthreads();
 
-  // if (threadIdx.x == 0 && threadIdx.y == 0 && x == 0 && y == 0)
-  // {
-  //   for(int i = 0; i < 65; i ++){
-  //   printf("x: %d y: %d Tile x: %f Tile y: %f input x: %f input y: %f\n",i, 0,vortTile[i + 1][1][0], vortTile[i + 1][1][1], input[2 * i], input[2 * i + 1]);
-  //   }
-  //   // for(int i = 0; i < BLOCK_HEIGHT; i++) {
-  //   //   for(int j = 0; j < BLOCK_WIDTH; j++) {
-  //   //     int newX = j + blockIdx.x * blockDim.x;
-  //   //     int newY = i + blockIdx.y * blockDim.y;
-  //   //     printf("x: %d y: %d Tile x: %f Tile y: %f input x: %f input y: %f\n",newX, newY,vortTile[j + 1][i + 1][0], vortTile[j + 1][i + 1][1], input[CHANNELS * (newY * width + (newX))], input[CHANNELS * (newY * width + (newX)) + 1]);
-  //   //   }
-  //   // }
-  // }
+  if (threadIdx.x == 0 && threadIdx.y == 0)
+  {
+    for(int i = 0; i < 32; i ++){
+      for (int j = 0; j < 22; j++) {
+        int zeroX = 0 + (blockIdx.x * blockDim.x);
+        int zeroY = 0 + (blockIdx.y * blockDim.y);
+        int newX = zeroX + j - 1;
+        int newY = zeroY + i - 1;
+        if( (i != 0 || j != 0) && (j != 21 || i != 0) && (j != 0 || i != 31) && (j != 21 || i != 31)) {
+          if (newX > -1 && newX < width && newY > -1 && newY < height ) {
+            if (vortTile[j][i][0] != input[2 * ((newY * width) + newX)] || vortTile[j][i][1] != input[2 * ((newY * width) + newX) + 1]) {
+              printf("x: %d y: %d Tile x: %f Tile y: %f input x: %f input y: %f\n",newX, newY,vortTile[j][i][0], vortTile[j][i][1], input[2 * ((newY * width) + newX)], input[2 * ((newY * width) + newX) + 1]);
+            }
+          }
+        }
+      }
+    }
+  }
 
   //The vorticity funciton
   float dx = 0.01;
   float dy = 0.01;
 
-  //uint32_t idx = y * width + x;
+  uint32_t idx = y * width + x;
 
-  int start_x = (x == 0) ? 0 : threadIdx.x;
+  int start_x = (x == 0) ? 1 : threadIdx.x;
   int end_x = (x == width - 1) ? threadIdx.x + 1: threadIdx.x + 2;
 
-  int start_y = (y == 0) ? 0 : threadIdx.y;
+  int start_y = (y == 0) ? 1 : threadIdx.y;
   int end_y = (y == height - 1) ? threadIdx.y + 1: threadIdx.y + 2;
 
-  // duidx = (start_y * width + end_x) * 2;
-  //uint32_t dvidx = (end_y * width + start_x) * 2;
+  uint32_t duidx = (start_y * width + end_x) * 2;
+  uint32_t dvidx = (end_y * width + start_x) * 2;
 
   double fdu[2] = {vortTile[end_x][start_y][0], vortTile[end_x][start_y][1]};
   double fdv[2] = {vortTile[start_x][end_y][0], vortTile[start_x][end_y][1]};
@@ -89,6 +99,39 @@ void convertTile(int height, int width, unsigned char *output, float *input) {
 
   float vort = duy - dvx;
   //End of vorticity function
+
+  // add old vorticity function and run on input compare outputs and see if vorticity is messing something up 
+  //The vorticity funciton
+  dx = 0.01;
+  dy = 0.01;
+
+  idx = y * width + x;
+
+  start_x = (x == 0) ? 0 : x - 1;
+  end_x = (x == width - 1) ? x : x + 1;
+
+  start_y = (y == 0) ? 0 : y - 1;
+  end_y = (y == height - 1) ? y : y + 1;
+
+  duidx = (start_y * width + end_x) * 2;
+  dvidx = (end_y * width + start_x) * 2;
+
+  double fdu2[2] = {input[duidx], input[duidx + 1]};
+  double fdv2[2] = {input[dvidx], input[dvidx + 1]};
+  double vec02[2] = {input[idx * 2], input[idx * 2 + 1]};
+
+  float duy2 = (fdu2[1] - vec02[1]) / (dx * (end_x - start_x));
+  float dvx2 = (fdv2[0] - vec02[0]) / (dy * (end_y - start_y));
+
+  float vort2 = duy2 - dvx2;
+  //End of vorticity function 
+  if (dvx != dvx2 && blockIdx.x == 1 and blockIdx.y == 0) {
+    printf("problem tile:%f original: %f at x: %d y: %d\n", dvx, dvx2, x, y);
+  }
+  if (fdv[0] != fdv2[0] && blockIdx.x == 1 and blockIdx.y == 0) {
+    printf("fdv problem tile:%f original: %f at x: %d y: %d\n", fdv[0], fdv2[0], x, y);
+  }
+
   unsigned char vortChar;
     if (vort < -0.2f) {
       vortChar = 0;
@@ -173,7 +216,6 @@ int main() {
     std::cout << "opened" << std::endl;
     vectorField.seekg(0, std::ios_base::end);
     auto length = vectorField.tellg();
-    printf("%d", length);
     vectorField.seekg(0, std::ios::beg);
 
     auto fl_size = sizeof(float);
