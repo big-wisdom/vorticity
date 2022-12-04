@@ -1,3 +1,13 @@
+/*
+  This code is meant to be run on a cuda device. 
+  You must first use the command module load cuda 
+  to ensure that you can compile correctly with 
+  nvcc parallel_shared_memory_gpu.cu -o object_name.
+  Once the code is compiled you can run then run the
+  code with ./object_name assuming you have prepared 
+  the gpu correctly. 
+*/
+
 #include <cstring> 
 #include <fstream>
 #include <iostream>
@@ -14,8 +24,6 @@
 #define HALO 2
 #define CHANNELS 2
 
-//This doesn't work just the beginnings of an idea
-
 __global__
 void convertTile(int height, int width, unsigned char *output, float *input) {
 
@@ -26,60 +34,47 @@ void convertTile(int height, int width, unsigned char *output, float *input) {
 
   // Copy over the vector information to the tile
   
-  if (threadIdx.x == 0 && x != 0) {
+  if (threadIdx.x == 0 && x != 0) { //get Left Halo
     vortTile[threadIdx.x][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + (x - 1))];
     vortTile[threadIdx.x][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + (x - 1))) + 1];
   }
   
-  if (threadIdx.x == (BLOCK_WIDTH - 1) && x != width - 1) {
+  if (threadIdx.x == (BLOCK_WIDTH - 1) && x != width - 1) { //get Right Halo
     vortTile[threadIdx.x + 2][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + (x + 1))];
     vortTile[threadIdx.x + 2][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + (x + 1))) + 1];
   }
  
-  if (threadIdx.y == 0 && y != 0) {
+  if (threadIdx.y == 0 && y != 0) { //get Upper Halo
+    if (threadIdx.x == (BLOCK_WIDTH - 1) && x != width - 1) { //get Upper Right Corner 
+      vortTile[threadIdx.x + 2][threadIdx.y][0] = input[CHANNELS * (((y - 1) * WIDTH) + (x + 1))];
+      vortTile[threadIdx.x + 2][threadIdx.y][1] = input[CHANNELS * (((y - 1) * WIDTH) + (x + 1)) + 1];
+    }
     vortTile[threadIdx.x + 1][threadIdx.y][0] = input[CHANNELS * (((y - 1) * WIDTH) + x)];
     vortTile[threadIdx.x + 1][threadIdx.y][1] = input[(CHANNELS * (((y - 1) * WIDTH) + x)) + 1];
   }
   
-  if (threadIdx.y == (BLOCK_HEIGHT - 1) && y != height - 1) {
+  if (threadIdx.y == (BLOCK_HEIGHT - 1) && y != height - 1) { // Get Lower Halo
+    if (threadIdx.x == 0 && x != 0) { //get Lower Left Corner
+      vortTile[threadIdx.x][threadIdx.y + 2][0] = input[CHANNELS * (((y + 1) * WIDTH) + (x - 1))];  
+      vortTile[threadIdx.x][threadIdx.y + 2][1] = input[(CHANNELS * (((y + 1) * WIDTH) + (x - 1))) + 1];
+    }
     vortTile[threadIdx.x + 1][threadIdx.y + 2][0] = input[CHANNELS * (((y + 1) * WIDTH) + x)];  
     vortTile[threadIdx.x + 1][threadIdx.y + 2][1] = input[(CHANNELS * (((y + 1) * WIDTH) + x)) + 1];
-  }
-  if (blockIdx.x == 0 && blockIdx.y == 0) {
-    printf("Threadx: %d thready: %d x: %d y: %d\n", threadIdx.x, threadIdx.y, x, y);
   }
   vortTile[threadIdx.x + 1][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + x)];
   vortTile[threadIdx.x + 1][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + x)) + 1];
   __syncthreads();
 
-  // if (threadIdx.x == 0 && threadIdx.y == 0 && x == 0 && y == 0)
-  // {
-  //   for(int i = 0; i < 65; i ++){
-  //   printf("x: %d y: %d Tile x: %f Tile y: %f input x: %f input y: %f\n",i, 0,vortTile[i + 1][1][0], vortTile[i + 1][1][1], input[2 * i], input[2 * i + 1]);
-  //   }
-  //   // for(int i = 0; i < BLOCK_HEIGHT; i++) {
-  //   //   for(int j = 0; j < BLOCK_WIDTH; j++) {
-  //   //     int newX = j + blockIdx.x * blockDim.x;
-  //   //     int newY = i + blockIdx.y * blockDim.y;
-  //   //     printf("x: %d y: %d Tile x: %f Tile y: %f input x: %f input y: %f\n",newX, newY,vortTile[j + 1][i + 1][0], vortTile[j + 1][i + 1][1], input[CHANNELS * (newY * width + (newX))], input[CHANNELS * (newY * width + (newX)) + 1]);
-  //   //   }
-  //   // }
-  // }
-
+  //I am not sure if cuda can call a function that is in another file so I just put this here. 
   //The vorticity funciton
   float dx = 0.01;
   float dy = 0.01;
 
-  //uint32_t idx = y * width + x;
-
-  int start_x = (x == 0) ? 0 : threadIdx.x;
+  int start_x = (x == 0) ? 1 : threadIdx.x;
   int end_x = (x == width - 1) ? threadIdx.x + 1: threadIdx.x + 2;
 
-  int start_y = (y == 0) ? 0 : threadIdx.y;
+  int start_y = (y == 0) ? 1 : threadIdx.y;
   int end_y = (y == height - 1) ? threadIdx.y + 1: threadIdx.y + 2;
-
-  // duidx = (start_y * width + end_x) * 2;
-  //uint32_t dvidx = (end_y * width + start_x) * 2;
 
   double fdu[2] = {vortTile[end_x][start_y][0], vortTile[end_x][start_y][1]};
   double fdv[2] = {vortTile[start_x][end_y][0], vortTile[start_x][end_y][1]};
@@ -89,6 +84,7 @@ void convertTile(int height, int width, unsigned char *output, float *input) {
 
   float vort = duy - dvx;
   //End of vorticity function
+
   unsigned char vortChar;
     if (vort < -0.2f) {
       vortChar = 0;
@@ -102,6 +98,7 @@ void convertTile(int height, int width, unsigned char *output, float *input) {
 
 }
 
+//An old global convert function
 __global__
 void convert(int height, int width, unsigned char *output, float *input) {
   int x = threadIdx.x + blockIdx.x * blockDim.x;
@@ -173,7 +170,6 @@ int main() {
     std::cout << "opened" << std::endl;
     vectorField.seekg(0, std::ios_base::end);
     auto length = vectorField.tellg();
-    printf("%d", length);
     vectorField.seekg(0, std::ios::beg);
 
     auto fl_size = sizeof(float);
@@ -190,7 +186,7 @@ int main() {
     //parallel_shared_memory_cpu(HEIGHT, WIDTH, input, output);
     parallel_shared_memory_gpu(HEIGHT, WIDTH, input, output, length);
     // Writing output to file
-    std::fstream outField("outfield.raw", std::ios::out | std::ios::binary);
+    std::fstream outField("outfieldGpu.raw", std::ios::out | std::ios::binary);
     outField.write(reinterpret_cast<char *>(output), length / CHANNELS);
     outField.close();
   } else {
