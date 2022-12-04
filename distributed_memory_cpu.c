@@ -27,7 +27,7 @@ int*    sendcounts;
 int*    displs;
 float*  input;
 float*  tempin;
-float*  tempout;
+unsigned char*  tempout;
 unsigned char*  output;
 
 /* functions */
@@ -50,7 +50,7 @@ int main(int argc, char* argv[]) {
 
   /* Find total number of processes */
   MPI_Comm_size(MPI_COMM_WORLD, &core_count);
-  printf("core count: %d\n", core_count);
+  //printf("core count: %d\n", core_count);
 
   printf("MPI initiated\n");
   /* Initiate important variables and arrays for all */
@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
   displs = malloc(core_count*sizeof(int));
   tempin = malloc((tileh+2)*width*channels*sizeof(float));
   tempout = malloc(tileh*width*sizeof(unsigned char));
-  printf("tileh = %d\n", tileh);
+  //printf("tileh = %d\n", tileh);
   printf("initial values created memory allocated\n");
 
   /* Rank 0 initiation work*/
@@ -91,7 +91,7 @@ int main(int argc, char* argv[]) {
     }
     if (i == 0) {displs[i] = 0;} // displs
     else {displs[i] = (tileh*i-1)*width*channels;}
-    printf("i-%d, sendcount-%d, displs-%d\n",i,sendcounts[i],displs[i]);
+    //printf("i-%d, sendcount-%d, displs-%d\n",i,sendcounts[i],displs[i]);
   }
   
   printf("Scattering data \n");
@@ -99,11 +99,18 @@ int main(int argc, char* argv[]) {
   // send data out to all cores
   MPI_Scatterv(input, sendcounts, displs, MPI_FLOAT, tempin, sendcounts[my_rank], MPI_FLOAT,0, MPI_COMM_WORLD); 
   
+  /*
   for (i = 0; i < 600; i++) {
     for (j = 0; j < 1300; j++) {
       printf("tempin: %4.3f, %4.3f;", tempin[i*width+j], tempin[i*width+j+1]);
     }
   }
+  for (i = 0; i < 600; i++) {
+    for (j = 0; j < 1300; j++) {
+      printf("tempout: %d;", tempout[i*width+j]);
+    }
+  }
+  */
 
   printf("Calculating vorticity \n");
 
@@ -126,12 +133,13 @@ int main(int argc, char* argv[]) {
     end = k-1;
   }
   counter = 0;
-  printf("k: %d\n",k);
-  printf("start: %d\n",start);
-  printf("end: %d\n",end);
-  for (int i = start; i < end; i++) { // choose row
-    for (int j = 0; j < width; j++) { // go through elements in row i
+  //printf("k: %d\n",k);
+  //printf("start: %d\n",start);
+  //printf("end: %d\n",end);
+  for (i = start; i < end; i++) { // choose row
+    for (j = 0; j < width; j++) { // go through elements in row i
       //printf("(%d, %d)-%d;", j, i, counter);
+      // errors at 
       float vort = vorticity(j, i, width, height, tempin);
       if (vort < -0.2f) {
         vortChar = 0;
@@ -149,26 +157,29 @@ int main(int argc, char* argv[]) {
 
   /* get values for sendcounts and displs arrays for gatherv */
   for (i = 0; i < core_count; i++) {
-    if (i == core_count-1) { // sendcounts
+    if (core_count == 1) {
+      sendcounts[i] = tileh*width;
+    } else if (i == core_count-1) { // at the end
       sendcounts[i] = (height-(core_count-1)*tileh+1)*width;
     } else {
       sendcounts[i] = tileh*width; 
     }
     if (i == 0) {displs[i] = 0;} // displs
     else {displs[i] = (tileh*i-1)*width;}
+    //printf("i-%d, sendcount-%d, displs-%d\n",i,sendcounts[i],displs[i]);
   }
 
   printf("Gathering data \n");
 
   /* collecting data from all cores*/
-  MPI_Gatherv(tempout, sendcounts[my_rank], MPI_UNSIGNED_CHAR, output, sendcounts[my_rank], displs[my_rank], MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
+  MPI_Gatherv(tempout, sendcounts[my_rank], MPI_UNSIGNED_CHAR, output, sendcounts, displs, MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
 
   printf("Writing outfile\n");
 
   /* writing outfile */
   if (my_rank == 0) {
     wf = fopen("outfield.raw", "wb");
-    fwrite(&output, sizeof(unsigned char), height*width, wf);
+    fwrite(output, sizeof(unsigned char), height*width, wf);
     fclose(wf);
 
     free(input);
