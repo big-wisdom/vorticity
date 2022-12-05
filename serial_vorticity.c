@@ -1,4 +1,5 @@
-#include "vorticity.hpp"
+#include "vorticity.h"
+#include <stdbool.h>
 
 void serial_vorticity(int HEIGHT, int WIDTH, float* input, unsigned char * output) {
     // CPU serial implementation
