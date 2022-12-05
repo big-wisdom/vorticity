@@ -7,10 +7,21 @@
   code with ./object_name assuming you have prepared 
   the gpu correctly. 
 */
-
 #include <cstring> 
 #include <iostream>
 #include <string>
+#include <stdio.h>
+
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+  if (code != cudaSuccess)
+  {
+    fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+    if (abort) exit(code);
+  }
+}
+
 
 
 #define WIDTH 1300
@@ -19,6 +30,12 @@
 #define GRID_HEIGHT 20
 #define BLOCK_WIDTH 20
 #define BLOCK_HEIGHT 30
+// #define WIDTH 260
+// #define HEIGHT 120
+// #define GRID_WIDTH 13
+// #define GRID_HEIGHT 4
+// #define BLOCK_WIDTH 20
+// #define BLOCK_HEIGHT 30
 #define HALO 2
 #define CHANNELS 2
 
@@ -32,7 +49,6 @@ void convertTile(int height, int width, unsigned char *output, float *input, int
   int y = threadIdx.y + (blockIdx.y * blockDim.y);
   // adjust those coordinates for the data block this node is responsible for
   if (my_rank != 0) y+=1;
-  if (y==0) printf("my_rank: %d, y: %d\n", my_rank, y);
 
   // Copy over the vector information to the tile
   if (threadIdx.x == 0 && x != 0) { //get Left Halo
@@ -122,7 +138,9 @@ extern "C" void parallel_shared_memory_gpu(int height, int width, float* input, 
     const dim3 grid_size (GRID_WIDTH, grid_height);
 
     convertTile<<<grid_size, block_size>>>(height, width, outputDevice, inputDevice, my_rank, core_count);
-    printf("Error: %d", cudaDeviceSynchronize());
+    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaDeviceSynchronize() );
+    // printf("Error: %d", cudaDeviceSynchronize());
 
     //Return image to device and free memory
     cudaMemcpy(output, outputDevice, length / 8, cudaMemcpyDeviceToHost);
@@ -130,3 +148,18 @@ extern "C" void parallel_shared_memory_gpu(int height, int width, float* input, 
     cudaFree(outputDevice);
 }
 
+// int main()
+// {
+//     int height = 301;
+//     int width = 1300;
+//     int channels = 2;
+// 
+//     // read in input
+//     float* input = (float*)malloc(height*width*channels*sizeof(float));
+//     unsigned char* output = (unsigned char*)malloc(height*width*sizeof(unsigned char));
+//     FILE* pf = fopen("cyl2d_1300x600_float32[2].raw", "rb");
+//     fread(input, sizeof(float), height*width*channels, pf);
+//     fclose(pf);
+// 
+//     parallel_shared_memory_gpu(height, width, input, output, height*width*channels*sizeof(float), 0, 2);
+// }

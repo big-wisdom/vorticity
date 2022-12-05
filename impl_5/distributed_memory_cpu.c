@@ -67,6 +67,11 @@ int main(int argc, char* argv[]) {
   width = 1300;
   height = 600;
   channels = 2;
+  ////////// TOY SCENARIO //////////////
+  // width = 260;
+  // height = 120;
+  // channels = 2;
+  ////////// TOY SCENARIO //////////////
   if (height/core_count*core_count == height) {tileh = height/core_count;}  ///////// This seems weird. Does this just check if core_count == 0?
   else {tileh = height/core_count + 1;} ///////// integer division then add one great idea
   sendcounts = malloc(core_count*sizeof(int));
@@ -126,7 +131,7 @@ int main(int argc, char* argv[]) {
   printf("Calculating vorticity \n");
 
   /* calculating vorticity */ 
-  parallel_shared_memory_gpu(halo_tileh, width, tempin, tempout, halo_tileh*width*channels, my_rank, core_count);
+  parallel_shared_memory_gpu(halo_tileh, width, tempin, tempout, halo_tileh*width*channels*sizeof(float), my_rank, core_count);
   // if (core_count == 1) {// using k as "height" of the tempin
   //   k = tileh;
   //   start = 0;
