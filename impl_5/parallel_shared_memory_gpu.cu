@@ -23,15 +23,18 @@
 #define CHANNELS 2
 
 __global__
-void convertTile(int height, int width, unsigned char *output, float *input) {
+void convertTile(int height, int width, unsigned char *output, float *input, int my_rank, int core_count) {
 
   __shared__ float vortTile[BLOCK_WIDTH + HALO][BLOCK_HEIGHT + HALO][CHANNELS];
 
+  // these are coordinates in the already tiled block that the node recieved
   int x = threadIdx.x + (blockIdx.x * blockDim.x);
   int y = threadIdx.y + (blockIdx.y * blockDim.y);
+  // adjust those coordinates for the data block this node is responsible for
+  if (my_rank != 0) y+=1;
+  if (y==0) printf("my_rank: %d, y: %d\n", my_rank, y);
 
   // Copy over the vector information to the tile
-  
   if (threadIdx.x == 0 && x != 0) { //get Left Halo
     vortTile[threadIdx.x][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + (x - 1))];
     vortTile[threadIdx.x][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + (x - 1))) + 1];
@@ -84,50 +87,6 @@ void convertTile(int height, int width, unsigned char *output, float *input) {
   //End of vorticity function
 
   unsigned char vortChar;
-    if (vort < -0.2f) {
-      vortChar = 0;
-    } else if (vort > 0.2f) {
-      vortChar = 127;
-    } else {
-      vortChar = 255;
-    }
-    output[y * width + x] = vortChar;
-    __syncthreads();
-
-}
-
-//An old global convert function
-__global__
-void convert(int height, int width, unsigned char *output, float *input) {
-  int x = threadIdx.x + blockIdx.x * blockDim.x;
-  int y = threadIdx.y + blockIdx.y * blockDim.y;
-
-  //The vorticity funciton
-  float dx = 0.01;
-  float dy = 0.01;
-
-  uint32_t idx = y * width + x;
-
-  int start_x = (x == 0) ? 0 : x - 1;
-  int end_x = (x == width - 1) ? x : x + 1;
-
-  int start_y = (y == 0) ? 0 : y - 1;
-  int end_y = (y == height - 1) ? y : y + 1;
-
-  uint32_t duidx = (start_y * width + end_x) * 2;
-  uint32_t dvidx = (end_y * width + start_x) * 2;
-
-  double fdu[2] = {input[duidx], input[duidx + 1]};
-  double fdv[2] = {input[dvidx], input[dvidx + 1]};
-  double vec0[2] = {input[idx * 2], input[idx * 2 + 1]};
-
-  float duy = (fdu[1] - vec0[1]) / (dx * (end_x - start_x));
-  float dvx = (fdv[0] - vec0[0]) / (dy * (end_y - start_y));
-
-  float vort = duy - dvx;
-  //End of vorticity function 
-
-  unsigned char vortChar;
   if (vort < -0.2f) {
     vortChar = 0;
   } else if (vort > 0.2f) {
@@ -136,9 +95,12 @@ void convert(int height, int width, unsigned char *output, float *input) {
     vortChar = 255;
   }
   output[y * width + x] = vortChar;
+  __syncthreads();
+
 }
 
-extern "C" void parallel_shared_memory_gpu(int height, int width, float* input, unsigned char* output, int length) {
+
+extern "C" void parallel_shared_memory_gpu(int height, int width, float* input, unsigned char* output, int length, int my_rank, int core_count) {
     //Prepare cuda stuff
     float *inputDevice;
     unsigned char * outputDevice;
@@ -148,10 +110,18 @@ extern "C" void parallel_shared_memory_gpu(int height, int width, float* input, 
     cudaMemcpy(inputDevice, input, length, cudaMemcpyHostToDevice);
     cudaMemcpy(outputDevice, output, length / 8, cudaMemcpyHostToDevice);
 
+    // calculate grid and block size
+    int data_height = height - 2; // data size is the height minus the top and bottom
+    if (my_rank == 0 || my_rank == core_count - 1) data_height += 1; // unless this is the fist or last rank
+    int grid_height = data_height / BLOCK_HEIGHT;
+    if (grid_height * BLOCK_HEIGHT < data_height) {
+      grid_height += 1;
+    }
+    printf("Height: %d, data_height: %d grid_height: %d\n", height, data_height, grid_height);
     const dim3 block_size (BLOCK_WIDTH, BLOCK_HEIGHT);
-    const dim3 grid_size (GRID_WIDTH, GRID_HEIGHT);
+    const dim3 grid_size (GRID_WIDTH, grid_height);
 
-    convertTile<<<grid_size, block_size>>>(height, width, outputDevice, inputDevice);
+    convertTile<<<grid_size, block_size>>>(height, width, outputDevice, inputDevice, my_rank, core_count);
     printf("Error: %d", cudaDeviceSynchronize());
 
     //Return image to device and free memory
@@ -159,3 +129,4 @@ extern "C" void parallel_shared_memory_gpu(int height, int width, float* input, 
     cudaFree(inputDevice);
     cudaFree(outputDevice);
 }
+

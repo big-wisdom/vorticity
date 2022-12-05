@@ -4,13 +4,14 @@ A_number: a02377965
 
 Load Modules: 
 
+module load gcc/11.2.0
 module load openmpi cuda
 
 Compile using: 
 
 mpicc -c distributed_memory.c -o main.o
 nvcc -c parallel_shared_memory_gpu.cu -o gpu_code.o
-mpicc main.o paralle_shared_memory_gpu.cu -o project -lstdc++
+mpicc main.o gpu_code.o -lcudart -o project -lstdc++
 
 Run using: 
     mpiexec -n <core_count> ./project
@@ -88,17 +89,17 @@ int main(int argc, char* argv[]) {
   printf("File read, getting values for sendcounts and displs\n");
 
   /* get values for sendcounts and displs arrays for scatterv */
+  int halo_tileh = tileh;
   for (i = 0; i < core_count; i++) {
-    if (core_count == 1) {
-      sendcounts[i] = tileh*width*channels; /////////// if only using one core set the single value in sendcounts
-    } else if (i == core_count-1) { // at the end
-        ///////// is it possible that this could be negative from the adding 1 to tileh
-      sendcounts[i] = (height-(core_count-1)*tileh+1)*width*channels; //////// set the last one to take whatever is left
+    if (i == core_count-1) { // at the end
+      halo_tileh = (height-(core_count-1)*tileh+1); //////// set the last one to take whatever is left
     } else if (i == 0) {  // at the beginning
-      sendcounts[i] = (tileh+1)*width*channels; /////// no need to grab a line above if you're at the top
+      halo_tileh += 1;
     } else {
-      sendcounts[i] = (tileh+2)*width*channels; 
+      halo_tileh += 2;
     }
+    sendcounts[i] = (halo_tileh)*width*channels;
+
     if (i == 0) {displs[i] = 0;} // displs
     else {displs[i] = (tileh*i-1)*width*channels;}
     //printf("i-%d, sendcount-%d, displs-%d\n",i,sendcounts[i],displs[i]);
@@ -125,7 +126,7 @@ int main(int argc, char* argv[]) {
   printf("Calculating vorticity \n");
 
   /* calculating vorticity */ 
-  parallel_shared_memory_gpu(height, width, tempin, tempout, height*width*channels);
+  parallel_shared_memory_gpu(halo_tileh, width, tempin, tempout, halo_tileh*width*channels, my_rank, core_count);
   // if (core_count == 1) {// using k as "height" of the tempin
   //   k = tileh;
   //   start = 0;
