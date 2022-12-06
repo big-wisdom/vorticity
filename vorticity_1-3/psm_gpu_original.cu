@@ -154,7 +154,7 @@ void convert(int height, int width, unsigned char *output, float *input) {
   output[y * width + x] = vortChar;
 }
 
-extern "C" void parallel_shared_memory_gpu(int height, int width, float * input, unsigned char * output, int length) {
+extern "C" float parallel_shared_memory_gpu(int height, int width, float * input, unsigned char * output, int length) {
     //Prepare cuda stuff
     float *inputDevice;
     unsigned char * outputDevice;
@@ -198,20 +198,20 @@ extern "C" void parallel_shared_memory_gpu(int height, int width, float * input,
 //     vectorField.seekg(0, std::ios_base::end);
 //     auto length = vectorField.tellg();
 //     vectorField.seekg(0, std::ios::beg);
-// 
+
 //     auto fl_size = sizeof(float);
-// 
+
 //     // Initialize arrays
 //     float *input = new float[length / fl_size];
 //     unsigned char *output = new unsigned char[length / fl_size / CHANNELS];
-// 
+
 //     // Get rgb values from image into input array
 //     vectorField.read((char *)input, length);
 //     vectorField.close();
-// 
+
 //     // serial_vorticity(HEIGHT, WIDTH, input, output);
 //     //parallel_shared_memory_cpu(HEIGHT, WIDTH, input, output);
-//     parallel_shared_memory_gpu(HEIGHT, WIDTH, input, output, length);
+//     float time = parallel_shared_memory_gpu(HEIGHT, WIDTH, input, output, length);
 //     // Writing output to file
 //     std::fstream outField("outfieldGpu.raw", std::ios::out | std::ios::binary);
 //     outField.write(reinterpret_cast<char *>(output), length / CHANNELS);
