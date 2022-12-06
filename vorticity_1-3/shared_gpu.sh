@@ -8,4 +8,7 @@
 #SBATCH --gres=gpu
 
 #Run the program with input
-./vorticityGpu 
+cudaMemCheck vorticityGpu | more
+
+Compilie with -lineinfo 
+
