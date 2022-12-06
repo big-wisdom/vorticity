@@ -3,4 +3,6 @@ build/
 .cache
 compile_commands.json
 .vscode
+there.sh
+back.sh
 
