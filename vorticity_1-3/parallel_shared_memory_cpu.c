@@ -9,7 +9,7 @@ float parallel_shared_memory_cpu(int HEIGHT, int WIDTH, float * input, unsigned 
   int i, j;
   float time;
   clock_t start, end;
-  start = clock()
+  start = clock();
   #pragma omp parallel num_threads(thread_count) default(none) shared(output, input, HEIGHT, WIDTH) private(i, j)
   {
       #pragma omp for collapse(2)
@@ -28,7 +28,7 @@ float parallel_shared_memory_cpu(int HEIGHT, int WIDTH, float * input, unsigned 
         }
       }
   }
-  end = clock()
+  end = clock();
   time = ((double) (end - start)) / CLOCKS_PER_SEC;
   return time;
 }

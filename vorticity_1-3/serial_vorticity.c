@@ -1,3 +1,9 @@
+/*
+  The approach we took to run the serial code is to just travel along the entire image 
+  row by row and call the vorticity function at each location and send that to the output. 
+*/
+
+
 #include "vorticity.h"
 #include <stdbool.h>
 #include <time.h>
@@ -6,7 +12,7 @@ float serial_vorticity(int HEIGHT, int WIDTH, float* input, unsigned char * outp
     // CPU serial implementation
     float time;
     clock_t start, end;
-    start = clock()
+    start = clock();
     for (int i = 0; i < HEIGHT; i++) {
       for (int j = 0; j < WIDTH; j++) {
         float vort = vorticity(j, i, WIDTH, HEIGHT, input);
@@ -21,7 +27,7 @@ float serial_vorticity(int HEIGHT, int WIDTH, float* input, unsigned char * outp
         output[i * WIDTH + j] = vortChar;
       }
     }
-    end = clock()
+    end = clock();
     time = ((double) (end - start)) / CLOCKS_PER_SEC;
     return time;
 }
