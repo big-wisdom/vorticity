@@ -32,16 +32,16 @@
 #define WIDTH 1300
 #define HEIGHT 600
 #define BLOCK_WIDTH 20
-#define BLOCK_HEIGTH 30
+#define BLOCK_HEIGHT 30
 #define GRID_WIDTH 65
 #define GRID_HEIGHT 20
 #define HALO 2
 #define CHANNELS 2
 
 __global__
-void convertTile(int height, int width, unsigned char *output, float *input, const int BLOCK_WIDTH, const int BLOCK_HEIGHT) {
+void convertTile(int height, int width, unsigned char *output, float *input) {
 
-  __shared__ float vortTile[blockDim.x + 2][blockDim.y + 2][2];
+  __shared__ float vortTile[BLOCK_WIDTH + HALO][BLOCK_HEIGHT + HALO][2];
 
   int x = threadIdx.x + (blockIdx.x * blockDim.x);
   int y = threadIdx.y + (blockIdx.y * blockDim.y);
@@ -174,7 +174,7 @@ extern "C" void parallel_shared_memory_gpu(int height, int width, float * input,
     const dim3 grid_size (GRID_WIDTH, GRID_HEIGHT);
 
     cudaEventRecord(startEvent, 0);
-    convertTile<<<grid_size, block_size>>>(height, width, outputDevice, inputDevice, BLOCK_WIDTH, BLOCK_HEIGHT);
+    convertTile<<<grid_size, block_size>>>(height, width, outputDevice, inputDevice);
     cudaEventRecord(stopEvent, 0);
     cudaEventSynchronize(stopEvent);
     cudaEventElapsedTime(&sharedTime, startEvent, stopEvent);
