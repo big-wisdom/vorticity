@@ -8,6 +8,20 @@
   the gpu correctly. 
 */
 
+/*
+  The approach we took was to read in the input file 
+  and then call the kernal. The kernal will take each 
+  point and place itself into shared memory. If the 
+  point is on one of the four edges it grabs that point
+  as well, assuming it is not the edge of the input vector 
+  field. 
+
+  Once the shared memory tile is filled out the code calls
+  the vorticity for each point using the vortTile. The 
+  code then places the vorticity output into the final 
+  image, and ends. 
+*/
+
 #include <cstring> 
 #include <fstream>
 #include <iostream>
@@ -17,17 +31,13 @@
 
 #define WIDTH 1300
 #define HEIGHT 600
-#define GRID_WIDTH 65
-#define GRID_HEIGHT 20
-#define BLOCK_WIDTH 20
-#define BLOCK_HEIGHT 30
 #define HALO 2
 #define CHANNELS 2
 
 __global__
-void convertTile(int height, int width, unsigned char *output, float *input) {
+void convertTile(int height, int width, unsigned char *output, float *input, const int block_width, const int block_height) {
 
-  __shared__ float vortTile[BLOCK_WIDTH + HALO][BLOCK_HEIGHT + HALO][CHANNELS];
+  __shared__ float vortTile[blockDim.x + 2][blockDim.y + 2][2];
 
   int x = threadIdx.x + (blockIdx.x * blockDim.x);
   int y = threadIdx.y + (blockIdx.y * blockDim.y);
@@ -35,34 +45,34 @@ void convertTile(int height, int width, unsigned char *output, float *input) {
   // Copy over the vector information to the tile
   
   if (threadIdx.x == 0 && x != 0) { //get Left Halo
-    vortTile[threadIdx.x][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + (x - 1))];
-    vortTile[threadIdx.x][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + (x - 1))) + 1];
+    vortTile[threadIdx.x][threadIdx.y + 1][0] = input[CHANNELS * ((y * width) + (x - 1))];
+    vortTile[threadIdx.x][threadIdx.y + 1][1] = input[(CHANNELS * ((y * width) + (x - 1))) + 1];
   }
   
-  if (threadIdx.x == (BLOCK_WIDTH - 1) && x != width - 1) { //get Right Halo
-    vortTile[threadIdx.x + 2][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + (x + 1))];
-    vortTile[threadIdx.x + 2][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + (x + 1))) + 1];
+  if (threadIdx.x == (block_width - 1) && x != width - 1) { //get Right Halo
+    vortTile[threadIdx.x + 2][threadIdx.y + 1][0] = input[CHANNELS * ((y * width) + (x + 1))];
+    vortTile[threadIdx.x + 2][threadIdx.y + 1][1] = input[(CHANNELS * ((y * width) + (x + 1))) + 1];
   }
  
   if (threadIdx.y == 0 && y != 0) { //get Upper Halo
-    if (threadIdx.x == (BLOCK_WIDTH - 1) && x != width - 1) { //get Upper Right Corner 
-      vortTile[threadIdx.x + 2][threadIdx.y][0] = input[CHANNELS * (((y - 1) * WIDTH) + (x + 1))];
-      vortTile[threadIdx.x + 2][threadIdx.y][1] = input[CHANNELS * (((y - 1) * WIDTH) + (x + 1)) + 1];
+    if (threadIdx.x == (block_width - 1) && x != width - 1) { //get Upper Right Corner 
+      vortTile[threadIdx.x + 2][threadIdx.y][0] = input[CHANNELS * (((y - 1) * width) + (x + 1))];
+      vortTile[threadIdx.x + 2][threadIdx.y][1] = input[CHANNELS * (((y - 1) * width) + (x + 1)) + 1];
     }
-    vortTile[threadIdx.x + 1][threadIdx.y][0] = input[CHANNELS * (((y - 1) * WIDTH) + x)];
-    vortTile[threadIdx.x + 1][threadIdx.y][1] = input[(CHANNELS * (((y - 1) * WIDTH) + x)) + 1];
+    vortTile[threadIdx.x + 1][threadIdx.y][0] = input[CHANNELS * (((y - 1) * width) + x)];
+    vortTile[threadIdx.x + 1][threadIdx.y][1] = input[(CHANNELS * (((y - 1) * width) + x)) + 1];
   }
   
-  if (threadIdx.y == (BLOCK_HEIGHT - 1) && y != height - 1) { // Get Lower Halo
+  if (threadIdx.y == (block_height - 1) && y != height - 1) { // Get Lower Halo
     if (threadIdx.x == 0 && x != 0) { //get Lower Left Corner
-      vortTile[threadIdx.x][threadIdx.y + 2][0] = input[CHANNELS * (((y + 1) * WIDTH) + (x - 1))];  
-      vortTile[threadIdx.x][threadIdx.y + 2][1] = input[(CHANNELS * (((y + 1) * WIDTH) + (x - 1))) + 1];
+      vortTile[threadIdx.x][threadIdx.y + 2][0] = input[CHANNELS * (((y + 1) * width) + (x - 1))];  
+      vortTile[threadIdx.x][threadIdx.y + 2][1] = input[(CHANNELS * (((y + 1) * width) + (x - 1))) + 1];
     }
-    vortTile[threadIdx.x + 1][threadIdx.y + 2][0] = input[CHANNELS * (((y + 1) * WIDTH) + x)];  
-    vortTile[threadIdx.x + 1][threadIdx.y + 2][1] = input[(CHANNELS * (((y + 1) * WIDTH) + x)) + 1];
+    vortTile[threadIdx.x + 1][threadIdx.y + 2][0] = input[CHANNELS * (((y + 1) * width) + x)];  
+    vortTile[threadIdx.x + 1][threadIdx.y + 2][1] = input[(CHANNELS * (((y + 1) * width) + x)) + 1];
   }
-  vortTile[threadIdx.x + 1][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + x)];
-  vortTile[threadIdx.x + 1][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + x)) + 1];
+  vortTile[threadIdx.x + 1][threadIdx.y + 1][0] = input[CHANNELS * ((y * width) + x)];
+  vortTile[threadIdx.x + 1][threadIdx.y + 1][1] = input[(CHANNELS * ((y * width) + x)) + 1];
   __syncthreads();
 
   //I am not sure if cuda can call a function that is in another file so I just put this here. 
@@ -146,20 +156,33 @@ extern "C" void parallel_shared_memory_gpu(int height, int width, float * input,
     unsigned char * outputDevice;
     cudaMalloc((void **) &inputDevice, length);
     cudaMalloc((void **) &outputDevice, length / 8);
-
     cudaMemcpy(inputDevice, input, length, cudaMemcpyHostToDevice);
     cudaMemcpy(outputDevice, output, length / 8, cudaMemcpyHostToDevice);
 
-    const dim3 block_size (BLOCK_WIDTH, BLOCK_HEIGHT);
-    const dim3 grid_size (GRID_WIDTH, GRID_HEIGHT);
+    //cuda Timing stuff
+    cudaEvent_t startEvent, stopEvent;
+    cudaEventCreate(&startEvent);
+    cudaEventCreate(&stopEvent);
+    float sharedTime;
 
-    convertTile<<<grid_size, block_size>>>(height, width, outputDevice, inputDevice);
+    //get Tile and Block size 
+    const dim3 block_size (block_width, block_height);
+    const dim3 grid_size (grid_width, grid_height);
+
+    cudaEventRecord(startEvent, 0);
+    convertTile<<<grid_size, block_size>>>(height, width, outputDevice, inputDevice, block_width, block_height);
+    cudaEventRecord(stopEvent, 0);
+    cudaEventSynchronize(stopEvent);
+    cudaEventElapsedTime(&sharedTime, startEvent, stopEvent);
+    
     printf("Error: %d", cudaDeviceSynchronize());
 
     //Return image to device and free memory
     cudaMemcpy(output, outputDevice, length / 8, cudaMemcpyDeviceToHost);
     cudaFree(inputDevice);
     cudaFree(outputDevice);
+
+    return sharedTime;
 }
 
 
