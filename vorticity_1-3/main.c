@@ -23,12 +23,13 @@ int main() {
 
     // create valid with serial algorithm
     printf("Running serial vorticity\n");
-    serial_vorticity(HEIGHT, WIDTH, input, valid);
+    float time0 = serial_vorticity(HEIGHT, WIDTH, input, valid);
 
     // Parallel shared memory
     printf("Running parallel shared memory cpu\n");
     unsigned char* psm_cpu_output = malloc(length*sizeof(unsigned char));
-    parallel_shared_memory_cpu(HEIGHT, WIDTH, input, psm_cpu_output);
+    int thread_count = 4;
+    float time1 = parallel_shared_memory_cpu(HEIGHT, WIDTH, input, psm_cpu_output, thread_count);
 
     if (validate(HEIGHT, WIDTH, psm_cpu_output, valid))
         printf("Parallel shared CPU valid\n");
@@ -38,7 +39,7 @@ int main() {
     // Parallel shared memory gpu
     printf("Running parallel shared memory GPU\n");
     unsigned char* psm_gpu_output = malloc(length*sizeof(unsigned char));
-    parallel_shared_memory_gpu(HEIGHT, WIDTH, input, psm_gpu_output, length*CHANNELS*sizeof(float));
+    float time3 = parallel_shared_memory_gpu(HEIGHT, WIDTH, input, psm_gpu_output, length*CHANNELS*sizeof(float));
 
     if (validate(HEIGHT, WIDTH, psm_gpu_output, valid))
         printf("Parallel shared GPU valid\n");

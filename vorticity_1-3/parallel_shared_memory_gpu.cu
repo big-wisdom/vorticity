@@ -140,26 +140,37 @@ void convert(int height, int width, unsigned char *output, float *input) {
   output[y * width + x] = vortChar;
 }
 
-extern "C" void parallel_shared_memory_gpu(int height, int width, float * input, unsigned char * output, int length) {
+extern "C" float parallel_shared_memory_gpu(int height, int width, float * input, unsigned char * output, int length) {
     //Prepare cuda stuff
     float *inputDevice;
     unsigned char * outputDevice;
     cudaMalloc((void **) &inputDevice, length);
     cudaMalloc((void **) &outputDevice, length / 8);
-
     cudaMemcpy(inputDevice, input, length, cudaMemcpyHostToDevice);
     cudaMemcpy(outputDevice, output, length / 8, cudaMemcpyHostToDevice);
+
+    //cuda Timing stuff
+    cudaEvent_t startEvent, stopEvent;
+    cudaEventCreate(&startEvent);
+    cudaEventCreate(&stopEvent);
+    float sharedTime;
 
     const dim3 block_size (BLOCK_WIDTH, BLOCK_HEIGHT);
     const dim3 grid_size (GRID_WIDTH, GRID_HEIGHT);
 
+    cudaEventRecord(startEvent, 0);
     convertTile<<<grid_size, block_size>>>(height, width, outputDevice, inputDevice);
+    cudaEventRecord(stopEvent, 0);
+    cudaEventSynchronize(stopEvent);
+    cudaEventElapsedTime(&sharedTime, startEvent, stopEvent);
     printf("Error: %d", cudaDeviceSynchronize());
 
     //Return image to device and free memory
     cudaMemcpy(output, outputDevice, length / 8, cudaMemcpyDeviceToHost);
     cudaFree(inputDevice);
     cudaFree(outputDevice);
+
+    return sharedTime;
 }
 
 
