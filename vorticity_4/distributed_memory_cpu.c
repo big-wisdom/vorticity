@@ -2,17 +2,38 @@
 Author: Jerry Zhou
 A_number: a02377965
 
-Load Modules: module load gcc/8.5.0
+Instructions for use: this code was ran successfully on the notchpeak
+distribution of chpc. To use this code, load the following modules 
+(in order) in the batch file or in an interactive node:
+[Load Modules]: module load gcc/8.5.0
               module load intel-mpi
-Compile using: mpicc -g -Wall -o project distributed_memory_cpu.cpp
-Run using: 
+Once the modules are loaded, the code can be compiled using the line below
+[Compile using]: mpicc -g -Wall -o project distributed_memory_cpu.cpp
+The compiler should output no errors nor warnings. Finally, run the code
+using the line below, where the only user input is <core_count>
+[Run using]: 
     mpiexec -n <core_count> ./project
+
+My approach with the MPI code was the separate the image purely by the rows,
+thereby flattening the 2D image into a 1D line of rows. The main benefit
+for this approach is that it is much easier to code and debug since most
+of the data manipulation is in 1D (there would be less worry about column
+indices). However, this has a major drawback in the amount of data needed 
+for haloing the data for the cores. Since everything is in the unit of rows,
+the size of the halo is necessarily also in the unit of rows. Compared to a
+rectangular or square block approach, whose maximum halo size is 
+2*tile_width + 2*tile_height, the maximum halo size for my implementation is
+2*total_width. Then, for instances where tile_height + tile_width < total width,
+the halo size for my implementation would be larger, which uses more memory
+and therefore would be much less feasible for an extremely wide image.
+
 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <mpi.h>
+//#include <sys/time.h>
 
 /* global variables */
 int     tileh; // tile width and height
@@ -41,6 +62,8 @@ int main(int argc, char* argv[]) {
   unsigned char vortChar;
   FILE* pf;
   FILE* wf;
+  //struct timeval start, end;
+  //float time_spent;
 
   /* Initiate MPI*/
   MPI_Init(NULL, NULL);
@@ -91,7 +114,6 @@ int main(int argc, char* argv[]) {
     }
     if (i == 0) {displs[i] = 0;} // displs
     else {displs[i] = (tileh*i-1)*width*channels;}
-    //printf("i-%d, sendcount-%d, displs-%d\n",i,sendcounts[i],displs[i]);
   }
   
   printf("Scattering data \n");
@@ -99,19 +121,7 @@ int main(int argc, char* argv[]) {
   // send data out to all cores
   MPI_Scatterv(input, sendcounts, displs, MPI_FLOAT, tempin, sendcounts[my_rank], MPI_FLOAT,0, MPI_COMM_WORLD); 
   
-  /*
-  for (i = 0; i < 600; i++) {
-    for (j = 0; j < 1300; j++) {
-      printf("tempin: %4.3f, %4.3f;", tempin[i*width+j], tempin[i*width+j+1]);
-    }
-  }
-  for (i = 0; i < 600; i++) {
-    for (j = 0; j < 1300; j++) {
-      printf("tempout: %d;", tempout[i*width+j]);
-    }
-  }
-  */
-
+  //gettimeofday(&start, NULL); // start timer
   printf("Calculating vorticity \n");
 
   /* calculating vorticity */ 
@@ -133,13 +143,9 @@ int main(int argc, char* argv[]) {
     end = k-1;
   }
   counter = 0;
-  //printf("k: %d\n",k);
-  //printf("start: %d\n",start);
-  //printf("end: %d\n",end);
+
   for (i = start; i < end; i++) { // choose row
     for (j = 0; j < width; j++) { // go through elements in row i
-      //printf("(%d, %d)-%d;", j, i, counter);
-      // errors at 
       float vort = vorticity(j, i, width, height, tempin);
       if (vort < -0.2f) {
         vortChar = 0;
@@ -166,11 +172,11 @@ int main(int argc, char* argv[]) {
     }
     if (i == 0) {displs[i] = 0;} // displs
     else {displs[i] = (tileh*i-1)*width;}
-    //printf("i-%d, sendcount-%d, displs-%d\n",i,sendcounts[i],displs[i]);
   }
 
+  //gettimeofday(&end,NULL); // end timer
   printf("Gathering data \n");
-
+  
   /* collecting data from all cores*/
   MPI_Gatherv(tempout, sendcounts[my_rank], MPI_UNSIGNED_CHAR, output, sendcounts, displs, MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
 
@@ -193,7 +199,9 @@ int main(int argc, char* argv[]) {
   free(displs);
   free(tempin);
   free(tempout);
-  
+
+  //time_spent = (end.tv_sec-start.tv_sec) + (end.tv_usec-start.tv_usec)/1000000.0;
+  //printf("Total time spent on core %d: %f sec\n",my_rank, time_spent);
   MPI_Finalize();
 
   return 0;
