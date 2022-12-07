@@ -1,6 +1,3 @@
-// NOTE FROM ELI: right now this is just the same as the serial statement, I'm about to start working on the omp statement
-// that I just copied in
-
 #include "vorticity.h"
 #include <omp.h>
 #include <time.h>

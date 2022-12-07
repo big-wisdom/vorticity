@@ -1,5 +1,5 @@
 /*  
-Author: Jerry Zhou
+Author: Jerry Zhou & Eli Hermann
 A_number: a02377965
 
 Load Modules: 
