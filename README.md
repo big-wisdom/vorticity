@@ -83,3 +83,20 @@ figuring out how to compile them together, it works like a charm.
 (NOTE: right now there is a line between nodes because we weren't able to test our code for 
 the last day before the due date. That's also why there is no timing or validation function
 on it because that's what we planned to do today, but CHPC is down.)
+
+# Timing Study
+## Timing of 1 vs 2 vs 3
+The timing of the first implementation vs the second vs the third reveal some expected behavior and 
+some unbehaviour. As the data input increased in size the time to run the code also increase with a 
+linear scale to the data increase size. This is seen in all 3 implementations. We don't see strong 
+scaling in the shared cpu implementation. There is actually no increase in speed from increasing 
+the number of threads in the parallel cpu implementation. This is unexpected behaviour, but we 
+imagine it is due to some serial part of the code being needed to run on every number of threads that 
+takes the same amount of time. The speed up from the multithreading does not increase the time, because
+the serial part of the code requires the same amount of time. 
+
+The size of the blocks for implementation 3, or the shared GPU implementation shows a increase in time 
+with problem size. It also shows a decrease with an increased number of threads up to a certain point 
+when the number of threads is to high and it takes longer to initialize threads than to run the data. 
+A decrease by half the size of the block, so therefore a doubling of threads, does not result in a halving
+of the time, but there is speedup and that is what is expected from a shared GPU implementation. 
