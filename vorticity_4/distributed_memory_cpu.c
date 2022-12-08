@@ -33,7 +33,7 @@ and therefore would be much less feasible for an extremely wide image.
 #include <stdlib.h>
 #include <string.h>
 #include <mpi.h>
-//#include <sys/time.h>
+#include <sys/time.h>
 
 /* global variables */
 int     tileh; // tile width and height
@@ -48,6 +48,7 @@ int*    sendcounts;
 int*    displs;
 float*  input;
 float*  tempin;
+float*  totalinput;
 unsigned char*  tempout;
 unsigned char*  output;
 
@@ -62,8 +63,8 @@ int main(int argc, char* argv[]) {
   unsigned char vortChar;
   FILE* pf;
   FILE* wf;
-  //struct timeval start, end;
-  //float time_spent;
+  struct timeval tstart, tend;
+  float time_spent;
 
   /* Initiate MPI*/
   MPI_Init(NULL, NULL);
@@ -77,26 +78,34 @@ int main(int argc, char* argv[]) {
 
   printf("MPI initiated\n");
   /* Initiate important variables and arrays for all */
+  int mult = 1;
+  height = 600 * mult;
   width = 1300;
-  height = 600;
   channels = 2;
+
   if (height/core_count*core_count == height) {tileh = height/core_count;}
   else {tileh = height/core_count + 1;}
   sendcounts = malloc(core_count*sizeof(int));
   displs = malloc(core_count*sizeof(int));
   tempin = malloc((tileh+2)*width*channels*sizeof(float));
   tempout = malloc(tileh*width*sizeof(unsigned char));
-  //printf("tileh = %d\n", tileh);
   printf("initial values created memory allocated\n");
 
   /* Rank 0 initiation work*/
   if (my_rank == 0) {
     // getting data from file
-    input = malloc(height*width*channels*sizeof(float));
+    input = malloc(600*width*channels*sizeof(float));
     output = malloc(height*width*sizeof(float));
     pf = fopen("cyl2d_1300x600_float32[2].raw", "rb");
-    fread(input, sizeof(float), height*width*channels, pf);
+    fread(input, sizeof(float), 600*width*channels, pf);
     fclose(pf);
+
+    totalinput = malloc(height*width*channels*sizeof(float));
+    for(int i=0; i<mult; i++){
+        memcpy(totalinput + (i * height*width), input, 
+        600*width*channels*sizeof(float));
+    }
+
   } 
 
   printf("File read, getting values for sendcounts and displs\n");
@@ -119,9 +128,9 @@ int main(int argc, char* argv[]) {
   printf("Scattering data \n");
 
   // send data out to all cores
-  MPI_Scatterv(input, sendcounts, displs, MPI_FLOAT, tempin, sendcounts[my_rank], MPI_FLOAT,0, MPI_COMM_WORLD); 
+  MPI_Scatterv(totalinput, sendcounts, displs, MPI_FLOAT, tempin, sendcounts[my_rank], MPI_FLOAT,0, MPI_COMM_WORLD); 
   
-  //gettimeofday(&start, NULL); // start timer
+  gettimeofday(&tstart, NULL); // start timer
   printf("Calculating vorticity \n");
 
   /* calculating vorticity */ 
@@ -174,7 +183,7 @@ int main(int argc, char* argv[]) {
     else {displs[i] = (tileh*i-1)*width;}
   }
 
-  //gettimeofday(&end,NULL); // end timer
+  gettimeofday(&tend,NULL); // end timer
   printf("Gathering data \n");
   
   /* collecting data from all cores*/
@@ -188,8 +197,7 @@ int main(int argc, char* argv[]) {
     fwrite(output, sizeof(unsigned char), height*width, wf);
     fclose(wf);
 
-    free(input);
-    free(output);
+    free(totalinput);
   }
 
   printf("Clean up and finalizing\n");
@@ -200,8 +208,8 @@ int main(int argc, char* argv[]) {
   free(tempin);
   free(tempout);
 
-  //time_spent = (end.tv_sec-start.tv_sec) + (end.tv_usec-start.tv_usec)/1000000.0;
-  //printf("Total time spent on core %d: %f sec\n",my_rank, time_spent);
+  time_spent = (tend.tv_sec-tstart.tv_sec) + (tend.tv_usec-tstart.tv_usec)/1000000.0;
+  printf("Total time spent on core %d: %f sec\n",my_rank, time_spent);
   MPI_Finalize();
 
   return 0;
