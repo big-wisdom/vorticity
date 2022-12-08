@@ -48,6 +48,7 @@ void convertTile(int height, int width, unsigned char *output, float *input, int
   int x = threadIdx.x + (blockIdx.x * blockDim.x);
   int y = threadIdx.y + (blockIdx.y * blockDim.y);
   // adjust those coordinates for the data block this node is responsible for
+  int old_y = y;
   if (my_rank != 0) y+=1;
 
   // Copy over the vector information to the tile
@@ -110,7 +111,7 @@ void convertTile(int height, int width, unsigned char *output, float *input, int
   } else {
     vortChar = 255;
   }
-  output[y * width + x] = vortChar;
+  output[old_y * width + x] = vortChar;
   __syncthreads();
 
 }
