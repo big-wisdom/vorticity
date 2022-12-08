@@ -17,12 +17,15 @@ Run using:
     mpiexec -n <core_count> ./project
 */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <mpi.h>
 #include "gpu.h"
+#include "implementations.h"
+#include "vorticity.h"
 
 /* global variables */
 int     tileh; // tile width and height
@@ -182,8 +185,13 @@ int main(int argc, char* argv[]) {
       sendcounts[i] = tileh*width; 
     }
     if (i == 0) {displs[i] = 0;} // displs
-    else {displs[i] = (tileh*i-1)*width;}
+    else {displs[i] = (tileh*i)*width;}
     //printf("i-%d, sendcount-%d, displs-%d\n",i,sendcounts[i],displs[i]);
+  }
+  if (my_rank == 0) {
+    for (i=0; i<core_count; i++) {
+      printf("core: %d, send_count: %d, displs: %d", i, sendcounts[i], displs[i]);
+    }
   }
 
   printf("Gathering data \n");
@@ -191,10 +199,23 @@ int main(int argc, char* argv[]) {
   /* collecting data from all cores*/
   MPI_Gatherv(tempout, sendcounts[my_rank], MPI_UNSIGNED_CHAR, output, sendcounts, displs, MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
 
-  printf("Writing outfile\n");
-
-  /* writing outfile */
   if (my_rank == 0) {
+    // Validating
+    unsigned char* valid_output = malloc(height*width*sizeof(unsigned char));
+    serial_vorticity(height, width, input, valid_output);
+    bool valid = validate(height, width, output, valid_output);
+    if (valid) printf("Valid output\n");
+    else printf("Invalid output\n");
+
+    printf("Writing serial outfile\n");
+    /* writing outfile */
+    wf = fopen("serial_outfield.raw", "wb");
+    fwrite(valid_output, sizeof(unsigned char), height*width, wf);
+    fclose(wf);
+
+
+    printf("Writing outfile\n");
+    /* writing outfile */
     wf = fopen("outfield.raw", "wb");
     fwrite(output, sizeof(unsigned char), height*width, wf);
     fclose(wf);
@@ -218,24 +239,24 @@ int main(int argc, char* argv[]) {
 }
 
 
-float vorticity(int x, int y, int width, int height, float *f) {
-  float dx = 0.01;
-  float dy = 0.01;
-
-  uint32_t idx = y * width + x;
-
-  int start_x = (x == 0) ? 0 : x - 1;
-  int end_x = (x == width - 1) ? x : x + 1;
-
-  int start_y = (y == 0) ? 0 : y - 1;
-  int end_y = (y == height - 1) ? y : y + 1;
-
-  uint32_t duidx = (start_y * width + end_x) * 2;
-  uint32_t dvidx = (end_y * width + start_x) * 2;
-
-  float duy = (f[duidx + 1] - f[idx * 2 + 1]) / (dx * (end_x - start_x));
-  float dvx = (f[dvidx] - f[idx * 2]) / (dy * (end_y - start_y));
-
-  return duy - dvx;
-}
+// float vorticity(int x, int y, int width, int height, float *f) {
+//   float dx = 0.01;
+//   float dy = 0.01;
+// 
+//   uint32_t idx = y * width + x;
+// 
+//   int start_x = (x == 0) ? 0 : x - 1;
+//   int end_x = (x == width - 1) ? x : x + 1;
+// 
+//   int start_y = (y == 0) ? 0 : y - 1;
+//   int end_y = (y == height - 1) ? y : y + 1;
+// 
+//   uint32_t duidx = (start_y * width + end_x) * 2;
+//   uint32_t dvidx = (end_y * width + start_x) * 2;
+// 
+//   float duy = (f[duidx + 1] - f[idx * 2 + 1]) / (dx * (end_x - start_x));
+//   float dvx = (f[dvidx] - f[idx * 2]) / (dy * (end_y - start_y));
+// 
+//   return duy - dvx;
+// }
 
