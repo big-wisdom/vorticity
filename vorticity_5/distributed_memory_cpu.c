@@ -97,13 +97,15 @@ int main(int argc, char* argv[]) {
   printf("File read, getting values for sendcounts and displs\n");
 
   /* get values for sendcounts and displs arrays for scatterv */
-  int halo_tileh = tileh;
+  int halo_tileh;
   for (i = 0; i < core_count; i++) {
+    halo_tileh = tileh;
     if (i == core_count-1) { // at the end
       halo_tileh = (height-(core_count-1)*tileh+1); //////// set the last one to take whatever is left
     } else if (i == 0) {  // at the beginning
       halo_tileh += 1;
     } else {
+      printf("tile height: %d, core: %d\n", tileh, my_rank);
       halo_tileh += 2;
     }
     sendcounts[i] = (halo_tileh)*width*channels;
@@ -113,10 +115,16 @@ int main(int argc, char* argv[]) {
     //printf("i-%d, sendcount-%d, displs-%d\n",i,sendcounts[i],displs[i]);
   }
   
-  printf("Scattering data \n");
+  printf("Core: %d Scattering data \n", my_rank);
 
   // send data out to all cores
+  if (my_rank == 0) {
+    for (i=0; i< core_count; i++) {
+      printf("core: %d, send_count: %d, displs: %d\n", i, sendcounts[i], displs[i]);
+    }
+  }
   MPI_Scatterv(input, sendcounts, displs, MPI_FLOAT, tempin, sendcounts[my_rank], MPI_FLOAT,0, MPI_COMM_WORLD); 
+  printf("core: %d here\n", my_rank);
   
   /*
   for (i = 0; i < 600; i++) {
