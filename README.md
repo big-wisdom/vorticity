@@ -100,3 +100,26 @@ with problem size. It also shows a decrease with an increased number of threads 
 when the number of threads is to high and it takes longer to initialize threads than to run the data. 
 A decrease by half the size of the block, so therefore a doubling of threads, does not result in a halving
 of the time, but there is speedup and that is what is expected from a shared GPU implementation. 
+
+## Timing of 4 vs 5
+For the timing of 4 and 5, two cases are studied. The first is the time spent using k number of cores for 
+k times the image size, thereby keeping constant the data size processed per core. This first case is done
+as a validation study to ensure that the implementation behaves as expected. The second case is the time
+spent using k number of cores for some fixed amount of data size. This second case is done to observe any 
+possible speedup that results from using MPI and/or MPI+Cuda.
+
+For the first case in the 4vs5-timevssizecore figure, the distributed memory GPU line in orange clearly shows 
+that the time spent clearly does not scale correctly with the number of cores and the data size. We expected
+the trend showed by the distributed memory CPU line in blue, which is mostly constant. We would have liked to 
+see a slightly negative slope for the distributed memory CPU line, however, as can be seen in the 
+4-timevssizecore figure the data points are mostly constant with a difference that can be attributed to 
+slight hardware and iterative differences.
+
+For the second case in the 4vs5-timevscore figure, the distributed memory GPU line in orange again shows a
+positive slope, which is completely not we expected. The distributed memory CPU line in blue shows an
+exponential negative slope, which is promising. A better figure, 4-timevscore, more clearly shows that the 
+distributed memroy CPU implementation speeds up dramatically initially and eventually becomes less
+effective as more cores are added. The diminishing returns are a likely effect of the increase in overhead
+as more cores need to communicate. The degree of speedup can be observed more clearly with the figure
+4-timevscorelog, which has log scaling on the y-axis. Since the line for the log scale figure still looks
+negative exponential, we know that there is some initial superlinear speedup, which then dissipates. 

@@ -59,21 +59,37 @@ hold off
 
 % 4,5
 datasize = [1,2,3,4];
-distCPUv = [0.019694, 0.019661, 0.019431, 0.019370];
-distCPUc = [0.075470, 0.037672, 0.019372, 0: 0.009963];
-distGPUv = [];
-distGPUc = [];
+distCPUv = [0.014762, 0.015037, 0.014744, 0.015153];
+% 2x size
+distCPUc = [0.028423, 0.014705, 0.008204, 0.005713];
+distGPUv = [0.129209, 0.394031];
+distGPUc = [0.125691, 0.394031];
 
+hold on
 figure
 plot(datasize, distCPUv)
+plot([1,2], distGPUv)
 title("Time spent on core 0 vs data size and core count")
 xlabel("Datasize (multiples of 3120000)")
 ylabel("Time (seconds)")
+legend("Distributed Mem CPU", "Distributed Mem GPU")
+hold off
 
-
+hold on
 figure
-
 plot(numcores, distCPUc)
+plot([1,2], distGPUc)
 title("Time spent on core 0 vs core count for fixed data size")
 ylabel("Time (in seconds)")
 xlabel("Number of cores")
+legend("Distributed Mem CPU", "Distributed Mem GPU")
+hold off
+
+hold on
+figure
+semilogy(numcores, distCPUc)
+title("Time spent on core 0 vs core count for fixed data size")
+ylabel("Time (in seconds)")
+xlabel("Number of cores")
+legend("Distributed Mem CPU", "Distributed Mem GPU")
+hold off

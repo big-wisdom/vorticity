@@ -183,12 +183,12 @@ int main(int argc, char* argv[]) {
     else {displs[i] = (tileh*i-1)*width;}
   }
 
-  gettimeofday(&tend,NULL); // end timer
+
   printf("Gathering data \n");
   
   /* collecting data from all cores*/
   MPI_Gatherv(tempout, sendcounts[my_rank], MPI_UNSIGNED_CHAR, output, sendcounts, displs, MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
-
+  gettimeofday(&tend,NULL); // end timer
   printf("Writing outfile\n");
 
   /* writing outfile */
