@@ -97,26 +97,37 @@ int main(int argc, char* argv[]) {
   printf("File read, getting values for sendcounts and displs\n");
 
   /* get values for sendcounts and displs arrays for scatterv */
-  int halo_tileh = tileh;
+  int my_halo_tileh = tileh;
   for (i = 0; i < core_count; i++) {
-    if (i == core_count-1) { // at the end
-      halo_tileh = (height-(core_count-1)*tileh+1); //////// set the last one to take whatever is left
+    if (core_count == 1) {
+      sendcounts[i] = tileh*width*channels;
+    } else if (i == core_count-1) { // at the end
+      // halo_tileh = (height-(core_count-1)*tileh+1); //////// set the last one to take whatever is left
+      sendcounts[i] = (height-(core_count-1)*tileh+1)*width*channels;
+      if (my_rank == i) my_halo_tileh = (height-(core_count-1)*tileh+1);
     } else if (i == 0) {  // at the beginning
-      halo_tileh += 1;
+      sendcounts[i] = (tileh+1)*width*channels;
+      if (my_rank == i) my_halo_tileh++;
     } else {
-      halo_tileh += 2;
+      sendcounts[i] = (tileh+2)*width*channels; 
+      if (my_rank == i) my_halo_tileh += 2;
     }
-    sendcounts[i] = (halo_tileh)*width*channels;
 
     if (i == 0) {displs[i] = 0;} // displs
     else {displs[i] = (tileh*i-1)*width*channels;}
     //printf("i-%d, sendcount-%d, displs-%d\n",i,sendcounts[i],displs[i]);
   }
   
-  printf("Scattering data \n");
+  printf("Core: %d Scattering data \n", my_rank);
 
   // send data out to all cores
+  if (my_rank == 0) {
+    for (i=0; i< core_count; i++) {
+      printf("core: %d, send_count: %d, displs: %d\n", i, sendcounts[i], displs[i]);
+    }
+  }
   MPI_Scatterv(input, sendcounts, displs, MPI_FLOAT, tempin, sendcounts[my_rank], MPI_FLOAT,0, MPI_COMM_WORLD); 
+  printf("core: %d here\n", my_rank);
   
   /*
   for (i = 0; i < 600; i++) {
@@ -134,7 +145,7 @@ int main(int argc, char* argv[]) {
   printf("Calculating vorticity \n");
 
   /* calculating vorticity */ 
-  parallel_shared_memory_gpu(halo_tileh, width, tempin, tempout, halo_tileh*width*channels*sizeof(float), my_rank, core_count);
+  parallel_shared_memory_gpu(my_halo_tileh, width, tempin, tempout, my_halo_tileh*width*channels*sizeof(float), my_rank, core_count);
   // if (core_count == 1) {// using k as "height" of the tempin
   //   k = tileh;
   //   start = 0;

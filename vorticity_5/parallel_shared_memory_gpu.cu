@@ -49,69 +49,74 @@ void convertTile(int height, int width, unsigned char *output, float *input, int
   int y = threadIdx.y + (blockIdx.y * blockDim.y);
   // adjust those coordinates for the data block this node is responsible for
   int old_y = y;
+  bool onData = old_y < height;
   if (my_rank != 0) y+=1;
 
-  // Copy over the vector information to the tile
-  if (threadIdx.x == 0 && x != 0) { //get Left Halo
-    vortTile[threadIdx.x][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + (x - 1))];
-    vortTile[threadIdx.x][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + (x - 1))) + 1];
-  }
-  
-  if (threadIdx.x == (BLOCK_WIDTH - 1) && x != width - 1) { //get Right Halo
-    vortTile[threadIdx.x + 2][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + (x + 1))];
-    vortTile[threadIdx.x + 2][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + (x + 1))) + 1];
-  }
- 
-  if (threadIdx.y == 0 && y != 0) { //get Upper Halo
-    if (threadIdx.x == (BLOCK_WIDTH - 1) && x != width - 1) { //get Upper Right Corner 
-      vortTile[threadIdx.x + 2][threadIdx.y][0] = input[CHANNELS * (((y - 1) * WIDTH) + (x + 1))];
-      vortTile[threadIdx.x + 2][threadIdx.y][1] = input[CHANNELS * (((y - 1) * WIDTH) + (x + 1)) + 1];
+  if (onData) {
+    // Copy over the vector information to the tile
+    if (threadIdx.x == 0 && x != 0) { //get Left Halo
+      vortTile[threadIdx.x][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + (x - 1))];
+      vortTile[threadIdx.x][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + (x - 1))) + 1];
     }
-    vortTile[threadIdx.x + 1][threadIdx.y][0] = input[CHANNELS * (((y - 1) * WIDTH) + x)];
-    vortTile[threadIdx.x + 1][threadIdx.y][1] = input[(CHANNELS * (((y - 1) * WIDTH) + x)) + 1];
-  }
-  
-  if (threadIdx.y == (BLOCK_HEIGHT - 1) && y != height - 1) { // Get Lower Halo
-    if (threadIdx.x == 0 && x != 0) { //get Lower Left Corner
-      vortTile[threadIdx.x][threadIdx.y + 2][0] = input[CHANNELS * (((y + 1) * WIDTH) + (x - 1))];  
-      vortTile[threadIdx.x][threadIdx.y + 2][1] = input[(CHANNELS * (((y + 1) * WIDTH) + (x - 1))) + 1];
+    
+    if (threadIdx.x == (BLOCK_WIDTH - 1) && x != width - 1) { //get Right Halo
+      vortTile[threadIdx.x + 2][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + (x + 1))];
+      vortTile[threadIdx.x + 2][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + (x + 1))) + 1];
     }
-    vortTile[threadIdx.x + 1][threadIdx.y + 2][0] = input[CHANNELS * (((y + 1) * WIDTH) + x)];  
-    vortTile[threadIdx.x + 1][threadIdx.y + 2][1] = input[(CHANNELS * (((y + 1) * WIDTH) + x)) + 1];
+   
+    if (threadIdx.y == 0 && y != 0) { //get Upper Halo
+      if (threadIdx.x == (BLOCK_WIDTH - 1) && x != width - 1) { //get Upper Right Corner 
+        vortTile[threadIdx.x + 2][threadIdx.y][0] = input[CHANNELS * (((y - 1) * WIDTH) + (x + 1))];
+        vortTile[threadIdx.x + 2][threadIdx.y][1] = input[CHANNELS * (((y - 1) * WIDTH) + (x + 1)) + 1];
+      }
+      vortTile[threadIdx.x + 1][threadIdx.y][0] = input[CHANNELS * (((y - 1) * WIDTH) + x)];
+      vortTile[threadIdx.x + 1][threadIdx.y][1] = input[(CHANNELS * (((y - 1) * WIDTH) + x)) + 1];
+    }
+    
+    if (threadIdx.y == (BLOCK_HEIGHT - 1) && y != height - 1) { // Get Lower Halo
+      if (threadIdx.x == 0 && x != 0) { //get Lower Left Corner
+        vortTile[threadIdx.x][threadIdx.y + 2][0] = input[CHANNELS * (((y + 1) * WIDTH) + (x - 1))];  
+        vortTile[threadIdx.x][threadIdx.y + 2][1] = input[(CHANNELS * (((y + 1) * WIDTH) + (x - 1))) + 1];
+      }
+      vortTile[threadIdx.x + 1][threadIdx.y + 2][0] = input[CHANNELS * (((y + 1) * WIDTH) + x)];  
+      vortTile[threadIdx.x + 1][threadIdx.y + 2][1] = input[(CHANNELS * (((y + 1) * WIDTH) + x)) + 1];
+    }
+    vortTile[threadIdx.x + 1][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + x)];
+    vortTile[threadIdx.x + 1][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + x)) + 1];
   }
-  vortTile[threadIdx.x + 1][threadIdx.y + 1][0] = input[CHANNELS * ((y * WIDTH) + x)];
-  vortTile[threadIdx.x + 1][threadIdx.y + 1][1] = input[(CHANNELS * ((y * WIDTH) + x)) + 1];
   __syncthreads();
 
   //I am not sure if cuda can call a function that is in another file so I just put this here. 
   //The vorticity funciton
-  float dx = 0.01;
-  float dy = 0.01;
+  if (onData) {
+    float dx = 0.01;
+    float dy = 0.01;
 
-  int start_x = (x == 0) ? 1 : threadIdx.x;
-  int end_x = (x == width - 1) ? threadIdx.x + 1: threadIdx.x + 2;
+    int start_x = (x == 0) ? 1 : threadIdx.x;
+    int end_x = (x == width - 1) ? threadIdx.x + 1: threadIdx.x + 2;
 
-  int start_y = (y == 0) ? 1 : threadIdx.y;
-  int end_y = (y == height - 1) ? threadIdx.y + 1: threadIdx.y + 2;
+    int start_y = (y == 0) ? 1 : threadIdx.y;
+    int end_y = (y == height - 1) ? threadIdx.y + 1: threadIdx.y + 2;
 
-  double fdu[2] = {vortTile[end_x][start_y][0], vortTile[end_x][start_y][1]};
-  double fdv[2] = {vortTile[start_x][end_y][0], vortTile[start_x][end_y][1]};
-  double vec0[2] = {vortTile[threadIdx.x + 1][threadIdx.y + 1][0], vortTile[threadIdx.x + 1][threadIdx.y + 1][1]};
-  float duy = (fdu[1] - vec0[1]) / (dx * (end_x - start_x));
-  float dvx = (fdv[0] - vec0[0]) / (dy * (end_y - start_y));
+    double fdu[2] = {vortTile[end_x][start_y][0], vortTile[end_x][start_y][1]};
+    double fdv[2] = {vortTile[start_x][end_y][0], vortTile[start_x][end_y][1]};
+    double vec0[2] = {vortTile[threadIdx.x + 1][threadIdx.y + 1][0], vortTile[threadIdx.x + 1][threadIdx.y + 1][1]};
+    float duy = (fdu[1] - vec0[1]) / (dx * (end_x - start_x));
+    float dvx = (fdv[0] - vec0[0]) / (dy * (end_y - start_y));
 
-  float vort = duy - dvx;
-  //End of vorticity function
+    float vort = duy - dvx;
+    //End of vorticity function
 
-  unsigned char vortChar;
-  if (vort < -0.2f) {
-    vortChar = 0;
-  } else if (vort > 0.2f) {
-    vortChar = 127;
-  } else {
-    vortChar = 255;
+    unsigned char vortChar;
+    if (vort < -0.2f) {
+      vortChar = 0;
+    } else if (vort > 0.2f) {
+      vortChar = 127;
+    } else {
+      vortChar = 255;
+    }
+    output[old_y * width + x] = vortChar;
   }
-  output[old_y * width + x] = vortChar;
   __syncthreads();
 
 }
